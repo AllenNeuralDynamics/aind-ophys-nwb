@@ -11,9 +11,8 @@ from dateutil.tz import tzlocal
 import pandas as pd
 import argparse
 
-from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO, NWBFile, TimeSeries
-from pynwb.image import ImageSeries
+from pynwb.image import Images, ImageSeries, GrayscaleImage
 from pynwb.ophys import (
     CorrectedImageStack,
     Fluorescence,
@@ -35,12 +34,29 @@ import file_handling
 def roi_table_to_pixel_masks(table):
     masks = []
     for index, roi in table.iterrows():
+        x0 = roi.x
+        y0 = roi.y
+        mask_matrix = np.array(roi.mask_matrix)
+
+        x, y = np.where(mask_matrix)
+        z = mask_matrix[x, y]
+        pixel_mask = np.stack((x + x0, y + y0, z), axis=1)
+
+        masks.append(pixel_mask)
+
+    return masks
+
+
+def roi_table_to_pixel_masks_OLD(table):
+    masks = []
+    for index, roi in table.iterrows():
         x = roi.x
         y = roi.y
         mask_matrix = roi.mask_matrix
 
-        # convert to X,Y coordinates, starting from x, y
-        x_coords, y_coords = np.where(mask_matrix)
+        # convert to X,Y coordinates, starting from x, y, z = value at x,y
+        #x_coords, y_coords = np.where(mask_matrix)
+        x_coords, y_coords, z = np.where(mask_matrix)
         x_coords = x_coords + x
         y_coords = y_coords + y
         
@@ -72,7 +88,6 @@ def load_dff_h5(dff_file: Union[str,Path],
 def df_col_to_array(df:pd.DataFrame, col:str)->np.ndarray:
     return np.stack(df[col].values)
 
-# single plane
 def nwb_ophys(file_paths: dict):
 
     # NOTE: could grab= session start time from _json
@@ -128,66 +143,91 @@ def nwb_ophys(file_paths: dict):
             origin_coords_unit="meters", #TODO
         )
 
-        # 3. ACQUISITION:
-        # TODO imaging planes raw data?
-        # two_p_series2 = TwoPhotonSeries(): add data or path to external file
+        # 3. ACQUISITION: raw/mc/decrosstalk movies
+        # two_p_series = TwoPhotonSeries(): 
         # nwbfile.add_acquisition(two_p_series)
 
         # 4. PROCESSING:
+        plane_desc = \
+        f"""
+        description:
+        """
         ophys_module = nwbfile.create_processing_module(
-            name=plane_name, description=f"Optical physiology processed data for plane: {plane_name}")
+            name="ophys_plane_" + plane_name, description=plane_desc)
 
-        # 4A. Motion Correction: Needed?
-        # + ImageSeries
-        # + TimeSeries (XY translation)
-        # + CorrectedImageStack
-        # + MotionCorrection
-        # + ophys_module.add(motion_correction)
+        # 4A. Motion Correction: skip for now
+        # e.g. TimeSeries() (XY translation)
 
         # 4B. Segmentation (can hold multiple plane segmentations)
         img_seg = ImageSegmentation()
 
-        average_projection = plt.imread(plane_files['average_projection_png'])
-        img_stack = average_projection[np.newaxis, :, :]
-        avg_projection = ImageSeries(
-            name="average_intensity_projection",
-            data=img_stack,
-            format="raw",
-            unit="float32",
-            rate = 0.0,
-        )
+        
+        #img_stack = average_projection[np.newaxis, :, :]
+        # avg_projection = ImageSeries(
+        #     name="average_intensity_projection",
+        #     data=img_stack,
+        #     format="raw",
+        #     unit="float32",
+        #     rate = 0.0,
+        # )
+
+        
 
         seg_table = pd.DataFrame(load_json(plane_files['segmentation_output_json']))
         ps = img_seg.create_plane_segmentation(
             name=md.plane_seg_approach, # TODO: name of segmentation
             description=md.plane_seg_descr, # TODO
             imaging_plane=imaging_plane,
-            reference_images=[avg_projection],  # NOTE: could add to list (max, corr etc), TODO,
             # columns = [seg_table.valid_roi.values],
             # colnames = ["valid_roi"]
         )
 
         ophys_module.add(img_seg)
 
-        # 4B. ROIS
+
+        # 4C. summary images
+        
+
+
+        avg_projection= plt.imread(plane_files['average_projection_png'])
+        avg_img = GrayscaleImage(name="average_projection",
+                             data=avg_projection,
+                             resolution=.78, # pixels/cm # TODO change
+                             description="Average intensity projection of entire session",)
+
+        max_projection = plt.imread(plane_files['max_projection_png'])
+        max_img = GrayscaleImage(name="max_projection",
+                             data=max_projection,
+                             resolution=.78, # pixels/cm # TODO change
+                             description="Max intensity projection of entire session",)
+
+        images = Images(name="summary_images",
+                        images=[avg_img, max_img],
+                        description="Summary images of the two-photon movie")
+        ophys_module.add(images)
+
+        
+
+        # 4D. ROIS
         roi_indices = seg_table.id
         rois_list = roi_table_to_pixel_masks(seg_table)
         for pixel_mask in rois_list:
             ps.add_roi(pixel_mask=pixel_mask)
 
-        # # 4C ROI response series
+        # # 4D. ROI response series (possible: raw,np-corrected,dfof,events)
         rt_region = ps.create_roi_table_region(
-            region=list(roi_indices), description="all rois"
+            region=list(roi_indices), description="all segmented rois"
         )
 
         # dfof
         dfof_traces, roi_names_dff = load_dff_h5(plane_files['dff_h5'])
         roi_response_series = RoiResponseSeries(
-            name="dfof_all_rois",
+            name="all_rois",
             data=dfof_traces,
             rois=rt_region,
             unit="deltaF/F",
             rate=10.0) # TODO: FRAME RATE
+            # timestamps = # TODO) 
 
         dfof = DfOverF(roi_response_series=roi_response_series)
         ophys_module.add(dfof)
@@ -247,7 +287,5 @@ if __name__ == "__main__":
     # write out
     output_path = Path(args.output_path).absolute()
     print(f"Writing to {output_path}")
-    with NWBZarrIO(str(output_path / "ophys.nwb"), "w") as io:
+    with NWBHDF5IO(str(output_path / "ophys.nwb"), "w") as io:
         io.write(nwbfile)
-
-
