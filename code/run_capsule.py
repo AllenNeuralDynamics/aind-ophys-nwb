@@ -11,6 +11,7 @@ from dateutil.tz import tzlocal
 import pandas as pd
 import argparse
 
+#from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO, NWBFile, TimeSeries
 from pynwb.image import Images, ImageSeries, GrayscaleImage
 from pynwb.ophys import (
@@ -91,8 +92,11 @@ def df_col_to_array(df:pd.DataFrame, col:str)->np.ndarray:
 def nwb_ophys(file_paths: dict):
 
     # NOTE: could grab= session start time from _json
-    raw_path = Path(file_paths["raw_path"])
-    session_name = raw_path.name
+    # raw_path = Path(file_paths["raw_path"])
+    # session_name = raw_path.name
+    processed_path = Path(file_paths["processed_path"])
+    session_name = "_".join(processed_path.name.split("_")[:4])
+
     dt = "_".join(session_name.split("_")[-2:])
     converted_dt = datetime.strptime(dt, "%Y-%m-%d_%H-%M-%S").astimezone(tzlocal())
 
@@ -127,7 +131,7 @@ def nwb_ophys(file_paths: dict):
         plane_path = Path(plane_files["processed_plane_path"])
         plane_name = plane_path.name
         print(f"Adding plane: {plane_name}")
-        # 3. imaging plane 
+        
         imaging_plane = nwbfile.create_imaging_plane(
             name=plane_name, # ophys_plane_id
             optical_channel=optical_channel,
@@ -257,9 +261,9 @@ def attached_dataset():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert ophys dataset to NWB")
-    parser.add_argument("--processed_path", type=str, help="Path to the processed ophys session folder", default = r'/data/multiplane-ophys_645814_2022-11-10_15-27-52_processed_2024-02-20_18-31-35')
-    parser.add_argument("--raw_path", type=str, help="Path to the raw ophys session folder",default=r'/data/multiplane-ophys_645814_2022-11-10_15-27-52')
-    parser.add_argument("--output_path", type=str, help="Path to the output file", default="/results/")
+    parser.add_argument("--processed_path", type=str, help="Path to the processed ophys session folder", default = r'../data/multiplane-ophys_645814_2022-11-10_15-27-52_processed_2024-02-20_18-31-35')
+    parser.add_argument("--raw_path", type=str, help="Path to the raw ophys session folder",default=r'../data/multiplane-ophys_645814_2022-11-10_15-27-52')
+    parser.add_argument("--output_path", type=str, help="Path to the output file", default="../results/")
     parser.add_argument("--run_attached", action='store_true')
     args = parser.parse_args()
 
@@ -279,7 +283,7 @@ if __name__ == "__main__":
         file_paths['planes'][plane_name] = file_handling.multiplane_session_data_files(plane_path)
         file_paths['planes'][plane_name]["processed_plane_path"] = plane_path
     file_paths["processed_path"] = processed_path
-    file_paths["raw_path"] = raw_path
+    #file_paths["raw_path"] = raw_path
 
     # make NWB
     nwbfile = nwb_ophys(file_paths)
