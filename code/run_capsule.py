@@ -32,7 +32,9 @@ import file_handling
 
 #from comb.behavior_ophys_dataset import BehaviorOphysDataset
 
-def roi_table_to_pixel_masks(table):
+# local dev: python run_capsule.py --processed_path aind-ophys-nwb/data/multiplane-ophys_739564_2024-08-26_14-35-58_processed_2024-08-28_21-48-36
+
+def roi_table_to_pixel_masks_old2(table):
     masks = []
     for index, roi in table.iterrows():
         x0 = roi.x
@@ -43,6 +45,32 @@ def roi_table_to_pixel_masks(table):
         z = mask_matrix[x, y]
         pixel_mask = np.stack((x + x0, y + y0, z), axis=1)
 
+        masks.append(pixel_mask)
+
+    return masks
+
+
+def roi_table_to_pixel_masks(table):
+    masks = []
+    for index, roi in table.iterrows():
+        x0 = roi.x
+        y0 = roi.y
+        mask_matrix = np.array(roi.mask_matrix)
+
+        # Use meshgrid to create coordinate arrays
+        y, x = np.meshgrid(np.arange(mask_matrix.shape[1]), np.arange(mask_matrix.shape[0]))
+        
+        # Only keep coordinates where mask_matrix is non-zero
+        non_zero = mask_matrix != 0
+        x = x[non_zero]
+        y = y[non_zero]
+        z = mask_matrix[non_zero]
+
+        # Add offsets
+        x = x + x0
+        y = y + y0
+
+        pixel_mask = np.stack((x, y, z), axis=1)
         masks.append(pixel_mask)
 
     return masks
