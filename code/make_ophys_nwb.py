@@ -13,26 +13,20 @@ import argparse
 
 #from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO, NWBFile, TimeSeries
-from pynwb.image import Images, ImageSeries, GrayscaleImage
+from pynwb.image import Images, GrayscaleImage
 from pynwb.ophys import (
-    CorrectedImageStack,
     Fluorescence,
     DfOverF,
     ImageSegmentation,
     MotionCorrection,
-    OnePhotonSeries,
     OpticalChannel,
     RoiResponseSeries,
     TwoPhotonSeries,
 )
 
-# capsule
-import metadata as md
 import file_handling
 
-#from comb.behavior_ophys_dataset import BehaviorOphysDataset
-
-# local dev: python run_capsule.py --processed_path aind-ophys-nwb/data/multiplane-ophys_739564_2024-08-26_14-35-58_processed_2024-08-28_21-48-36
+# local dev: python make_ophys_nwb.py --processed_path aind-ophys-nwb/data/multiplane-ophys_739564_2024-08-26_14-35-58_processed_2024-08-28_21-48-36
 
 def roi_table_to_pixel_masks_old2(table):
     masks = []
@@ -59,7 +53,7 @@ def roi_table_to_pixel_masks(table):
 
         # Use meshgrid to create coordinate arrays
         y, x = np.meshgrid(np.arange(mask_matrix.shape[1]), np.arange(mask_matrix.shape[0]))
-        
+
         # Only keep coordinates where mask_matrix is non-zero
         non_zero = mask_matrix != 0
         x = x[non_zero]
@@ -95,17 +89,19 @@ def roi_table_to_pixel_masks_OLD(table):
 
     return masks
 
+
 def load_json(fp):
     with open(fp, 'r') as f:
         j = json.load(f)
     return j
+
 
 def load_dff_h5(dff_file: Union[str,Path],
                 remove_nan_rows = False):
     with h5py.File(dff_file, "r") as f:
         dff = f["data"][:]
         roi_names = f["roi_names"][:]
- 
+
     if remove_nan_rows:
         # if row all nans, remove from dff and roi_names
         nan_rows = np.isnan(dff).all(axis=1)
@@ -114,44 +110,59 @@ def load_dff_h5(dff_file: Union[str,Path],
 
     return dff, roi_names
 
+
 def df_col_to_array(df:pd.DataFrame, col:str)->np.ndarray:
     return np.stack(df[col].values)
+
 
 def nwb_ophys(file_paths: dict):
 
     # NOTE: could grab= session start time from _json
     # raw_path = Path(file_paths["raw_path"])
     # session_name = raw_path.name
-    processed_path = Path(file_paths["processed_path"])
-    session_name = "_".join(processed_path.name.split("_")[:4])
+    processed_session_name = file_paths["processed_path"].name
+    session_name = "_".join(file_paths["processed_path"].name.split("_")[:4])
 
-    dt = "_".join(session_name.split("_")[-2:])
-    converted_dt = datetime.strptime(dt, "%Y-%m-%d_%H-%M-%S").astimezone(tzlocal())
+    # get time from session_name
+    # dt = "_".join(session_name.split("_")[-2:])
+    # converted_dt = datetime.strptime(dt, "%Y-%m-%d_%H-%M-%S").astimezone(tzlocal())
+
+    
+
+    md = file_handling.metadata_for_multiplane(file_paths["processed_path"])
+
+    start_time = md['session_start_time']
+    start_time = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%SZ").astimezone(tzlocal())
 
     # 1. set up the NWB file
+    expt_description = \
+    f"""
+    2-photon calcium imaging in regions {md['session_targeted_structures']} of the mouse brain.
+    Recordings were made as the mouse enagages int the following task or views these stimuli.
+    {md['session_task_description']}
+    """
+
     nwbfile = NWBFile(
-        session_description="my first synthetic recording", #TODO
-        identifier=str(uuid4()), # TODO
-        session_start_time=converted_dt, 
-        experimenter=["Baggins, Bilbo"], # TODO
-        lab="Bag End Laboratory", # TODO
+        session_description=md["session_type"],
+        identifier=processed_session_name,
+        session_start_time=start_time,
+        experimenter=md['experimenter'],
         institution="Allen Institute for Neural Dynamics",
-        experiment_description="I went on an adventure to reclaim vast treasures.", # TODO
+        experiment_description=expt_description,
         session_id=session_name,
     )
 
-
     # 2. metadata: microscope and optical channels
     device = nwbfile.create_device(
-        name=md.microscope_name,
-        description=md.microscope_desc,
-        manufacturer=md.microscope_manufacturer,
+        name=md["microscope_name"],
+        description=md["microscope_description"],
     )
 
+    # Could do red/green if we have multiple
     optical_channel = OpticalChannel(
-        name=md.oc1_name,
-        description=md.oc1_desc,
-        emission_lambda=md.oc1_el,
+        name="0", # TODO
+        description="2P Optical Channel", # TODO
+        emission_lambda=510.0, # TODO
     )
 
     # Start plane specific processing
@@ -159,94 +170,102 @@ def nwb_ophys(file_paths: dict):
         plane_path = Path(plane_files["processed_plane_path"])
         plane_name = plane_path.name
         print(f"Adding plane: {plane_name}")
+
         
+        # if error, likely using v4 pipeline outputs, where plane_name/lims_experiment_id mapping
+        # is not yet known. raise error. 
+        if plane_name not in md['ophys_fovs']:
+            raise ValueError(f"Plane name {plane_name} not found in ophys_fovs. \n\
+            Check that you are using the correct version of the capsule.")
+        else:
+            plane_md = md['ophys_fovs'][plane_name]
+
+        plane_description = \
+        f"""
+        ({plane_md['fov_width']}, {plane_md['fov_height']}) field of view
+        in {plane_md['targeted_structure']}
+        at depth {plane_md['imaging_depth']} um
+        """
+
+        # Grid spacing: physical position of pixels.
+        """
+        # Grid spacing: physical position of pixels/voxels
+        # - Can be ndarray, list, tuple, Dataset, Array, StrDataset, HDMFDataset, or AbstractDataChunkIterator
+        # - Specifies space between pixels in (x, y) or voxels in (x, y, z) directions
+        # - Uses the specified unit
+        # - Assumes imaging plane is a regular grid
+        # - See reference_frame to interpret the grid
+
+        Physical location of the first element of the imaging plane (0, 0) for 2-D data or (0, 0, 0) for 3-D data. 
+        See also reference_frame for what the physical location is relative to (e.g., bregma).
+        """
         imaging_plane = nwbfile.create_imaging_plane(
-            name=plane_name, # ophys_plane_id
+            name=plane_name,
             optical_channel=optical_channel,
-            imaging_rate=1234.0, # TODO
-            description="", # TODO
+            imaging_rate=float(plane_md['frame_rate']),  # Changed from 'imaging_rate' to 'frame_rate'
+            description=plane_description,
             device=device,
-            excitation_lambda=920.0, # TODO: double check, may have changed?
-            indicator="GFP", # TODO: subject/procedure.json
-            location="VISp", # TODO: session.json
-            grid_spacing=[0.01, 0.01], # TODO: dunno
-            grid_spacing_unit="meters", # TODO: dunno
-            origin_coords=[1.0, 2.0, 3.0], # TODO: dunno
-            origin_coords_unit="meters", #TODO
+            excitation_lambda=float(md['laser_wavelength']),
+            indicator=md['gcamp'],
+            location=plane_md['targeted_structure'],
+            grid_spacing=[float(plane_md['fov_scale_factor']), float(plane_md['fov_scale_factor'])],
+            grid_spacing_unit=plane_md['fov_scale_factor_unit'],
+            origin_coords=[1.0, 2.0, 3.0],  # TODO
+            origin_coords_unit="meters",  # TODO
         )
 
         # 3. ACQUISITION: raw/mc/decrosstalk movies
-        # two_p_series = TwoPhotonSeries(): 
-        # nwbfile.add_acquisition(two_p_series)
+        # Skipping for now
 
         # 4. PROCESSING:
-        plane_desc = \
-        f"""
-        description:
-        """
+        plane_processing_desc = f"Ophys processing module for {plane_name}"
         ophys_module = nwbfile.create_processing_module(
-            name="ophys_plane_" + plane_name, description=plane_desc)
+            name="ophys_plane_" + plane_name, description=plane_processing_desc)
 
-        # 4A. Motion Correction: skip for now
-        # e.g. TimeSeries() (XY translation)
-
-        # 4B. Segmentation (can hold multiple plane segmentations)
+        # 4B. Segmentation 
+        # Note: (can hold multiple plane segmentations)
         img_seg = ImageSegmentation()
 
-        
-        #img_stack = average_projection[np.newaxis, :, :]
-        # avg_projection = ImageSeries(
-        #     name="average_intensity_projection",
-        #     data=img_stack,
-        #     format="raw",
-        #     unit="float32",
-        #     rate = 0.0,
-        # )
-
-        
-
+        # TODO: metadata better for plane segmentation
+       
         seg_table = pd.DataFrame(load_json(plane_files['segmentation_output_json']))
+        seg_dict = seg_table.to_dict(orient='records')
+        print(seg_table.columns.tolist())
         ps = img_seg.create_plane_segmentation(
-            name=md.plane_seg_approach, # TODO: name of segmentation
-            description=md.plane_seg_descr, # TODO
+            name=md["ophys_seg_approach"],
+            description=md["ophys_seg_descr"],
             imaging_plane=imaging_plane,
-            # columns = [seg_table.valid_roi.values],
-            # colnames = ["valid_roi"]
+            #colnames=seg_table.columns.tolist(),
+            #columns=seg_dict,
         )
-
         ophys_module.add(img_seg)
 
-
-        # 4C. summary images
-        
-
-
-        avg_projection= plt.imread(plane_files['average_projection_png'])
+        # 4C. Summary images
+        avg_projection = plt.imread(plane_files['average_projection_png'])
         avg_img = GrayscaleImage(name="average_projection",
-                             data=avg_projection,
-                             resolution=.78, # pixels/cm # TODO change
-                             description="Average intensity projection of entire session",)
+                                 data=avg_projection,
+                                 resolution=float(plane_md['fov_scale_factor']),
+                                 description="Average intensity projection of entire session",)
 
         max_projection = plt.imread(plane_files['max_projection_png'])
         max_img = GrayscaleImage(name="max_projection",
-                             data=max_projection,
-                             resolution=.78, # pixels/cm # TODO change
-                             description="Max intensity projection of entire session",)
+                                 data=max_projection,
+                                 resolution=float(plane_md['fov_scale_factor']), 
+                                 description="Max intensity projection of entire session",)
 
         images = Images(name="summary_images",
                         images=[avg_img, max_img],
                         description="Summary images of the two-photon movie")
         ophys_module.add(images)
 
-        
-
-        # 4D. ROIS
+        # 4D. Rois
         roi_indices = seg_table.id
         rois_list = roi_table_to_pixel_masks(seg_table)
         for pixel_mask in rois_list:
             ps.add_roi(pixel_mask=pixel_mask)
 
-        # # 4D. ROI response series (possible: raw,np-corrected,dfof,events)
+        # # 4D. ROI response series
+        # TODO: add more  corrected/events)
         rt_region = ps.create_roi_table_region(
             region=list(roi_indices), description="all segmented rois"
         )
@@ -258,26 +277,11 @@ def nwb_ophys(file_paths: dict):
             data=dfof_traces,
             rois=rt_region,
             unit="deltaF/F",
-            rate=10.0) # TODO: FRAME RATE
-            # timestamps = # TODO) 
+            rate=float(plane_md['frame_rate'])),  # Changed from 'imaging_rate' to 'frame_rate'
+            # timestamps =)  #TODO: add timestamps
 
         dfof = DfOverF(roi_response_series=roi_response_series)
         ophys_module.add(dfof)
-
-        # dfof - valid only
-        # valid_roi_indices = seg_table[seg_table.valid_roi].index.values
-        # valid_dfof_traces = dfof_traces[valid_roi_indices]
-        # valid_rt_region = ps.create_roi_table_region(
-        #     region=list(valid_roi_indices), description="valid rois"
-        # )
-        # valid_roi_response_series = RoiResponseSeries(
-        #     name="dfof_valid_rois",
-        #     data=valid_dfof_traces,
-        #     rois=valid_rt_region,
-        #     unit="deltaF/F",
-        #     rate=dataset.metadata["ophys_frame_rate"])
-        # valid_dfof = DfOverF(roi_response_series=valid_roi_response_series)
-        # ophys_module.add(valid_dfof)
 
     return nwbfile
 
@@ -286,6 +290,7 @@ def attached_dataset():
     processed_path = Path("/root/capsule/data/multiplane-ophys_645814_2022-11-10_15-27-52_processed_2024-02-20_18-31-35")
     raw_path = Path("/root/capsule/data/multiplane-ophys_645814_2022-11-10_15-27-52")
     return processed_path, raw_path
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert ophys dataset to NWB")
@@ -300,18 +305,9 @@ if __name__ == "__main__":
     else:
         processed_path = args.processed_path
         raw_path = args.raw_path
-    
+
     # file handling & build dict for well known data files
-    processed_plane_paths = file_handling.plane_paths_from_session(processed_path, data_level = "processed")
-    file_paths = {}
-    file_paths['planes'] = {}
-    for plane_path in processed_plane_paths:
-        plane_path = Path(plane_path)
-        plane_name = plane_path.name
-        file_paths['planes'][plane_name] = file_handling.multiplane_session_data_files(plane_path)
-        file_paths['planes'][plane_name]["processed_plane_path"] = plane_path
-    file_paths["processed_path"] = processed_path
-    #file_paths["raw_path"] = raw_path
+    file_paths = file_handling.get_multiplane_processed_file_paths(processed_path)
 
     # make NWB
     nwbfile = nwb_ophys(file_paths)
