@@ -11,6 +11,7 @@ from dateutil.tz import tzlocal
 import pandas as pd
 import argparse
 
+from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO, NWBFile, TimeSeries
 from pynwb.image import Images, ImageSeries, GrayscaleImage
 from pynwb.ophys import (
@@ -88,25 +89,13 @@ def load_dff_h5(dff_file: Union[str,Path],
 def df_col_to_array(df:pd.DataFrame, col:str)->np.ndarray:
     return np.stack(df[col].values)
 
-def nwb_ophys(file_paths: dict):
+def nwb_ophys(nwbfile, file_paths: dict):
 
     # NOTE: could grab= session start time from _json
     raw_path = Path(file_paths["raw_path"])
     session_name = raw_path.name
     dt = "_".join(session_name.split("_")[-2:])
     converted_dt = datetime.strptime(dt, "%Y-%m-%d_%H-%M-%S").astimezone(tzlocal())
-
-    # 1. set up the NWB file
-    nwbfile = NWBFile(
-        session_description="my first synthetic recording", #TODO
-        identifier=str(uuid4()), # TODO
-        session_start_time=converted_dt, 
-        experimenter=["Baggins, Bilbo"], # TODO
-        lab="Bag End Laboratory", # TODO
-        institution="Allen Institute for Neural Dynamics",
-        experiment_description="I went on an adventure to reclaim vast treasures.", # TODO
-        session_id=session_name,
-    )
 
 
     # 2. metadata: microscope and optical channels
@@ -263,6 +252,10 @@ if __name__ == "__main__":
     parser.add_argument("--run_attached", action='store_true')
     args = parser.parse_args()
 
+    input_nwb_paths = list(data_folder.glob(r'nwb/*.nwb'))
+    if len(input_nwb_paths) != 1:
+        print("enter only 1 nwb!")
+        return
     if args.run_attached:
         processed_path, raw_path = attached_dataset()
     else:
@@ -281,8 +274,22 @@ if __name__ == "__main__":
     file_paths["processed_path"] = processed_path
     file_paths["raw_path"] = raw_path
 
+    # determine if file is zarr or hdf5, and copy it to results
+    result_nwb_path = results_folder / input_nwb_path.name
+    if input_nwb_path.is_dir():
+        assert (input_nwb_path / ".zattrs").is_file(), f"{input_nwb_path.name} is not a valid Zarr folder"
+        NWB_BACKEND = "zarr"
+        io_class = NWBZarrIO
+        shutil.copytree(input_nwb_path, result_nwb_path, dirs_exist_ok=True)
+    else:
+        NWB_BACKEND = "hdf5"
+        io_class = NWBHDF5IO
+        shutil.copyfile(input_nwb_path, result_nwb_path)
+    print(f"NWB backend: {NWB_BACKEND}")
     # make NWB
-    nwbfile = nwb_ophys(file_paths)
+    io = io_class(str(result_nwb_path), "r+", load_namespaces=True)
+    nwb_file = io.read()
+    nwbfile = nwb_ophys(nwb_file, file_paths)
 
     # write out
     output_path = Path(args.output_path).absolute()
