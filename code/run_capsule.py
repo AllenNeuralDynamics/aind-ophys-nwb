@@ -32,6 +32,11 @@ import file_handling
 
 #from comb.behavior_ophys_dataset import BehaviorOphysDataset
 
+data_folder = Path("../data/")
+scratch_folder = Path("../scratch/")
+results_folder = Path("../results/")
+
+
 def roi_table_to_pixel_masks(table):
     masks = []
     for index, roi in table.iterrows():
@@ -212,7 +217,7 @@ def nwb_ophys(nwbfile, file_paths: dict):
         dfof_traces, roi_names_dff = load_dff_h5(plane_files['dff_h5'])
         roi_response_series = RoiResponseSeries(
             name="all_rois",
-            data=dfof_traces,
+            data=dfof_traces.T,
             rois=rt_region,
             unit="deltaF/F",
             rate=10.0) # TODO: FRAME RATE
@@ -255,7 +260,6 @@ if __name__ == "__main__":
     input_nwb_paths = list(data_folder.glob(r'nwb/*.nwb'))
     if len(input_nwb_paths) != 1:
         print("enter only 1 nwb!")
-        return
     if args.run_attached:
         processed_path, raw_path = attached_dataset()
     else:
