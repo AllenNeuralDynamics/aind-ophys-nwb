@@ -295,6 +295,16 @@ def nwb_ophys(file_paths: dict):
             
             y, x = np.where(mask > 0)
             weights = mask[y, x]
+            x0 = table_row['x']
+            y0 = table_row['y']
+            x += x0
+            y += y0
+
+            # if x or y more than 512 print
+            if np.any(x > 512) or np.any(y > 512):
+                print(f"ROI {roi_id} has x or y values greater than 512")
+
+            
             pixel_mask = np.column_stack((x, y, weights))
             plane_segmentation.add_roi(pixel_mask=pixel_mask, **table_row.to_dict())
         ophys_module.add(img_seg)
