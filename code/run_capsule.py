@@ -300,5 +300,5 @@ if __name__ == "__main__":
     # write out
     output_path = Path(args.output_path).absolute()
     print(f"Writing to {output_path}")
-    with NWBHDF5IO(str(output_path / "ophys.nwb"), "w") as io:
+    with NWBHDF5IO(str(output_path / "ophys.nwb"), "r+") as io:
         io.write(nwbfile)
