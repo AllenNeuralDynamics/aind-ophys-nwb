@@ -26,7 +26,25 @@ from pynwb.ophys import (
 
 import file_handling
 
-# local dev: python make_ophys_nwb.py --processed_path aind-ophys-nwb/data/multiplane-ophys_739564_2024-08-26_14-35-58_processed_2024-08-28_21-48-36
+# local dev: python make_ophys_nwb.py --processed_path ../data/multiplane-ophys_739564_2024-08-26_14-35-58_processed_2024-08-28_21-48-36
+
+CELL_SPECIMEN_COL_DESCRIPTIONS = {
+    'cell_specimen_id': 'Unified id of segmented cell across experiments '
+                        '(after cell matching)',
+    'height': 'Height of ROI in pixels',
+    'width': 'Width of ROI in pixels',
+    'mask_image_plane': 'Which image plane an ROI resides on. Overlapping '
+                        'ROIs are stored on different mask image planes.',
+    'max_correction_down': 'Max motion correction in down direction in pixels',
+    'max_correction_left': 'Max motion correction in left direction in pixels',
+    'max_correction_up': 'Max motion correction in up direction in pixels',
+    'max_correction_right': 'Max motion correction in right direction in '
+                            'pixels',
+    'valid_roi': 'Indicates if cell classification found the ROI to be a cell '
+                 'or not',
+    'x': 'x position of ROI in Image Plane in pixels (top left corner)',
+    'y': 'y position of ROI in Image Plane in pixels (top left corner)'
+}
 
 def roi_table_to_pixel_masks_old2(table):
     masks = []
@@ -228,16 +246,57 @@ def nwb_ophys(file_paths: dict):
 
         # TODO: metadata better for plane segmentation
        
-        seg_table = pd.DataFrame(load_json(plane_files['segmentation_output_json']))
-        seg_dict = seg_table.to_dict(orient='records')
-        print(seg_table.columns.tolist())
-        ps = img_seg.create_plane_segmentation(
+        segmentation_table = pd.DataFrame(load_json(plane_files['segmentation_output_json']))
+
+        # Add this code to set the correct dtype for the 'exclusion_labels' column
+        if 'exclusion_labels' in segmentation_table.columns:
+            # Convert empty lists to empty numpy arrays with dtype 'U'
+            # segmentation_table['exclusion_labels'] = segmentation_table['exclusion_labels'].apply(
+            #     lambda x: np.array(x, dtype='U') if x else np.array([], dtype='U')
+            # )
+            segmentation_table = segmentation_table.drop(columns=['exclusion_labels'])
+
+        #seg_dict = seg_table.to_dict(orient='records')
+        #print(seg_table.columns.tolist())
+        plane_segmentation = img_seg.create_plane_segmentation(
             name=md["ophys_seg_approach"],
             description=md["ophys_seg_descr"],
-            imaging_plane=imaging_plane,
-            #colnames=seg_table.columns.tolist(),
-            #columns=seg_dict,
+            imaging_plane=imaging_plane
         )
+
+        for col_name in segmentation_table.columns:
+            # the columns 'roi_mask', 'pixel_mask', and 'voxel_mask' are
+            # already defined in the nwb.ophys::PlaneSegmentation Object
+            if col_name not in [
+                "id",
+                "mask_matrix",
+                "roi_mask",
+                "pixel_mask",
+                "voxel_mask",
+                "exclusion_labels",
+            ]:
+                # This builds the columns with name of column and description
+                # of column both equal to the column name in the cell_roi_table
+                plane_segmentation.add_column(
+                    col_name,
+                    CELL_SPECIMEN_COL_DESCRIPTIONS.get(
+                        col_name, "No Description Available"
+                    ),
+                )
+
+        # go through each roi and add it to the plan segmentation object
+        print(segmentation_table.shape)
+        for roi_id, table_row in segmentation_table.iterrows():
+            mask = table_row.pop("mask_matrix")
+            if not isinstance(mask, np.ndarray):
+                mask = np.array(mask)
+
+            table_row["id"] = roi_id
+            
+            y, x = np.where(mask > 0)
+            weights = mask[y, x]
+            pixel_mask = np.column_stack((x, y, weights))
+            plane_segmentation.add_roi(pixel_mask=pixel_mask, **table_row.to_dict())
         ophys_module.add(img_seg)
 
         # 4C. Summary images
@@ -258,29 +317,30 @@ def nwb_ophys(file_paths: dict):
                         description="Summary images of the two-photon movie")
         ophys_module.add(images)
 
-        # 4D. Rois
-        roi_indices = seg_table.id
-        rois_list = roi_table_to_pixel_masks(seg_table)
-        for pixel_mask in rois_list:
-            ps.add_roi(pixel_mask=pixel_mask)
+        # # 4D. Rois
+        # roi_indices = seg_table.id
+        # rois_list = roi_table_to_pixel_masks(seg_table)
+        # for pixel_mask in rois_list:
+        #     ps.add_roi(pixel_mask=pixel_mask)
 
-        # # 4D. ROI response series
-        # TODO: add more  corrected/events)
-        rt_region = ps.create_roi_table_region(
-            region=list(roi_indices), description="all segmented rois"
-        )
+        # # # 4D. ROI response series
+        # # TODO: add more  corrected/events)
+        dff_traces, roi_ids_dff = load_dff_h5(plane_files['dff_h5'])
+        print(dff_traces.shape)
+        roi_table_region = plane_segmentation.create_roi_table_region(
+            description="segmented cells labeled by id",
+            region=slice(len(dff_traces)))
 
         # dfof
-        dfof_traces, roi_names_dff = load_dff_h5(plane_files['dff_h5'])
         roi_response_series = RoiResponseSeries(
-            name="all_rois",
-            data=dfof_traces,
-            rois=rt_region,
-            unit="deltaF/F",
+            name="traces",
+            data=dff_traces.T,
+            rois=roi_table_region,
+            unit='ΔF/F',
             rate=float(plane_md['frame_rate'])),  # Changed from 'imaging_rate' to 'frame_rate'
             # timestamps =)  #TODO: add timestamps
 
-        dfof = DfOverF(roi_response_series=roi_response_series)
+        dfof = DfOverF(name = "dff", roi_response_series=roi_response_series)
         ophys_module.add(dfof)
 
     return nwbfile
