@@ -6,6 +6,7 @@ import json
 import h5py
 import shutil
 import glob
+import os 
 
 import matplotlib.pyplot as plt
 import numpy as np
