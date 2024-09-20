@@ -250,6 +250,30 @@ def attached_dataset():
     raw_path = Path("/root/capsule/data/multiplane-ophys_645814_2022-11-10_15-27-52")
     return processed_path, raw_path
 
+
+def find_latest_processed_folder():
+    # Define a glob pattern to match processed folders in /data/
+    pattern = '/data/*multiplane-ophys*_processed_*'
+    processed_folders = glob.glob(pattern)
+
+    if processed_folders:
+        # Sort by modification time and return the latest one
+        return max(processed_folders, key=os.path.getmtime)
+    else:
+        raise FileNotFoundError("No processed folder found in /data/")
+
+# Function to get the latest raw folder
+def find_latest_raw_folder():
+    # Define a glob pattern to match raw folders in /data/
+    pattern = '/data/*multiplane-ophys*'
+    raw_folders = [folder for folder in glob.glob(pattern) if 'processed' not in folder]
+
+    if raw_folders:
+        # Sort by modification time and return the latest one
+        return max(raw_folders, key=os.path.getmtime)
+    else:
+        raise FileNotFoundError("No raw folder found in /data/")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert ophys dataset to NWB")
     parser.add_argument("--processed_path", type=str, help="Path to the processed ophys session folder", default = r'/data/multiplane-ophys_645814_2022-11-10_15-27-52_processed_2024-02-20_18-31-35')
@@ -262,12 +286,15 @@ if __name__ == "__main__":
     if len(input_nwb_paths) != 1:
         print("enter only 1 nwb!")
     input_nwb_path = input_nwb_paths[0]
+    '''
     if args.run_attached:
         processed_path, raw_path = attached_dataset()
     else:
         processed_path = args.processed_path
         raw_path = args.raw_path
-    
+    '''
+    processed_path = find_latest_processed_folder()
+    raw_path = find_latest_raw_folder()
     # file handling & build dict for well known data files
     processed_plane_paths = file_handling.plane_paths_from_session(processed_path, data_level = "processed")
     file_paths = {}
