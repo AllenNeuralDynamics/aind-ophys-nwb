@@ -2,7 +2,8 @@
 
 from pathlib import Path
 import json
-from typing import Union
+from typing import Union, Dict
+import warnings
 
 # set up logger
 import logging
@@ -152,3 +153,244 @@ def plane_paths_from_session(session_path: Union[Path, str],
     elif data_level == "raw":
         planes = list((session_path / 'ophys').glob('ophys_experiment_*'))
     return planes
+
+
+def get_multiplane_processed_file_paths(processed_path: Union[Path, str]) -> dict:
+    """
+    Create a dictionary of file paths for a processed ophys session.
+
+    Parameters
+    ----------
+    processed_path : Union[Path, str]
+        Path to the processed ophys session folder.
+
+    Returns
+    -------
+    dict
+        A dictionary containing file paths for each plane and the processed path.
+    """
+    processed_path = Path(processed_path)
+    processed_plane_paths = plane_paths_from_session(processed_path, data_level="processed")
+
+    file_paths = {'planes': {}, 'processed_path': processed_path}
+
+    for plane_path in processed_plane_paths:
+        plane_path = Path(plane_path)
+        plane = plane_path.name
+        file_paths['planes'][plane] = multiplane_session_data_files(plane_path)
+        file_paths['planes'][plane]["processed_plane_path"] = plane_path
+
+    return file_paths
+
+####################################################################################################
+# METADATA EXTRACTION
+####################################################################################################
+
+
+def extract_laser_metadata(session_json: dict):
+    """Get laser metadata from the session json.
+
+    Parameters
+    ----------
+    session_json: dict
+        session json
+
+    Returns
+    -------
+    laser_metadata: dict
+    """
+    ophys_stream = extract_ophys_stream(session_json)
+    light_sources = ophys_stream.get('light_sources', [])
+    laser_stream = next((ls for ls in light_sources if ls.get('name') == 'Laser'), None)
+    if laser_stream is None:
+        raise ValueError("No Laser device found in data streams")
+    return {
+        'laser_wavelength': laser_stream.get('wavelength'),
+        'wavelength_unit': laser_stream.get('wavelength_unit')
+    }
+
+
+def extract_ophys_stream(session_json: dict):
+    """
+    Extract the ophys stream from the session metadata.
+
+    Parameters
+    ----------
+    metadata : dict
+        The session metadata dictionary.
+
+    Returns
+    -------
+    dict
+        The ophys stream data.
+
+    Raises
+    ------
+    ValueError
+        If no ophys stream is found in the metadata.
+    """
+    ophys_stream = next((stream for stream in session_json['data_streams'] 
+                         if any(modality.get('name') == 'Planar optical physiology' 
+                                for modality in stream.get('stream_modalities', []))), 
+                        None)
+
+    if not ophys_stream:
+        raise ValueError("No ophys stream found in the metadata")
+    
+    return ophys_stream
+
+
+def extract_ophys_fovs(session_json: dict):
+    """Get a dict of ophys fovs with the index and targeted structure as the key.
+
+    Parameters
+    ----------
+    session_json: dict
+        session json
+
+    Returns
+    -------
+    structured_fovs: dict
+    """
+    ophys_stream = extract_ophys_stream(session_json)
+    ophys_fovs = ophys_stream.get('ophys_fovs', [])
+    structured_fovs = {}
+
+    for fov in ophys_fovs:
+        index = fov.get('index')
+        targeted_structure = fov.get('targeted_structure')
+
+        if index is not None and targeted_structure is not None:
+            key = f"{targeted_structure}_{index}"
+            structured_fovs[key] = fov
+
+    return structured_fovs
+
+
+def gcamp_from_genotype(genotype: str):
+    """Get the gcamp version from the genotype.
+
+    Parameters
+    ----------
+    genotype: str
+        The genotype of the subject.
+
+    Returns
+    -------
+    gcamp_version: str
+    """
+
+    genotype_parts = genotype.split('-')
+    gcamp_part = next((part for part in genotype_parts if 'gcamp' in part.lower()), None)
+
+    # Check for wildtype genotype
+    if genotype.lower() in ['wt/wt', 'wt/wt ']:
+        warnings.warn("Wildtype genotype detected. "
+                      "Viral injection for GCaMP not implemented.",
+                      UserWarning)
+        return None
+
+    if gcamp_part:
+        return gcamp_part
+    else:
+        return None  # or you could return a default value or raise an exception
+
+
+def metadata_for_multiplane(data_path: Union[str, Path]) -> dict:
+    """Extract metadata to build nwb ophys file
+
+    Parameters
+    ----------
+    data_path: Union[str, Path]
+        path to the processed/raw multiplane ophys session folder
+
+    Returns
+    -------
+    metadata: dict
+
+    """
+
+    md = {}
+
+    jsons = load_metadata_json_files(data_path)
+
+    ### SESSION METADATA ###
+    md['session_start_time'] = jsons['session'].get('session_start_time')
+    md['experimenter'] = jsons['session'].get('experimenter_full_name')
+    md['session_type'] = jsons['session'].get('session_type')
+    md.update(extract_laser_metadata(jsons['session']))
+    md['ophys_fovs'] = extract_ophys_fovs(jsons['session'])
+
+    md['session_targeted_structures'] = list(set(
+        fov['targeted_structure'] 
+        for fov in md['ophys_fovs'].values()
+        if 'targeted_structure' in fov
+    ))
+
+    ### SESSION SUMMARY METADATA ###
+    md['session_num_planes'] = len(md['ophys_fovs'].keys())
+
+    imaging_depths = []
+    for fov in md['ophys_fovs'].values():
+        if 'imaging_depth' in fov:
+            imaging_depths.append(fov['imaging_depth'])
+
+    md['session_imaging_depths'] = sorted(imaging_depths)
+
+    # This should be a natural text summary of the task
+    md['session_task_description'] = "Visual change detection task."
+
+    ### RIG METADATA ###
+    # could get from rig, but also in session.json
+    md['microscope_name'] = jsons['session'].get('rig_id')
+    if md['microscope_name'] in ["MESO.1", "MESO.2"]:
+        md['microscope_description'] = "AIND Multiplane Mesoscope 2P Rig"
+    else:
+        md['microscope_description'] = "Unknown"
+
+    ### SUBJECT METADATA ###
+    md['subject_id'] = jsons['subject'].get('subject_id')
+    md['genotype'] = jsons['subject'].get('genotype')
+    md['sex'] = jsons['subject'].get('sex')
+    md['gcamp'] = gcamp_from_genotype(md['genotype'])
+
+    # TODO: better metadata for plane segmentation
+    md['ophys_seg_approach'] = "Cellpose"
+    md['ophys_seg_descr'] = "Cellpose segmentation of two-photon movie"
+
+    return md
+
+
+def load_metadata_json_files(processed_path: Union[str, Path]) -> Dict[str, Union[dict, None]]:
+    """
+    Load procedures.json, session.json, subject.json, and rig.json into a dictionary.
+
+    Parameters
+    ----------
+    processed_path : Union[str, Path]
+        Path to the processed ophys session folder.
+
+    Returns
+    -------
+    Dict[str, Union[dict, None]]
+        A dictionary containing the loaded JSON data for each file.
+        If a file is not found, its value will be None.
+    """
+    processed_path = Path(processed_path)
+    json_files = ['procedures.json', 'session.json', 'subject.json', 'rig.json']
+    result = {}
+
+    for file_name in json_files:
+        file_path = processed_path / file_name
+        if file_path.exists():
+            try:
+                with open(file_path, 'r') as f:
+                    result[file_name.replace('.json', '')] = json.load(f)
+            except json.JSONDecodeError:
+                print(f"Error decoding {file_name}. File may be empty or contain invalid JSON.")
+                result[file_name.replace('.json', '')] = {}
+        else:
+            print(f"File {file_name} not found in {processed_path}")
+            result[file_name.replace('.json', '')] = {}
+
+    return result
