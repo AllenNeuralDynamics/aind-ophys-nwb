@@ -1,3 +1,3 @@
-# aind-capsule-template
+# NWB-Packaging-Ophys-Base-Capsule
 
-Basic structure of a capsule to be customized as needed.
+Used to append various ophys data to an NWB file. Attach the raw, processed, and NWB assets for a session to use. 

@@ -1,5 +1,6 @@
 metadata_version: 1
-name: aind-ophys-nwb
-description: Basic structure of a capsule to be customized as needed.
+name: NWB-Packaging-Ophys-Base-Capsule
+description: Used to append various ophys data to an NWB file. Attach the raw, processed,
+  and NWB assets for a session to use.
 authors:
 - name: AIND
