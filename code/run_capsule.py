@@ -379,8 +379,6 @@ if __name__ == "__main__":
     with open(platform_json_path, 'r') as file:
         platform_json_data = json.load(file)
 
-    print(rig_json_data)
-
     # We get all timestamps
     sync_dataset = sync.load_sync(sync_path)
     timestamps = sync.get_edges(sync_file=sync_dataset, kind="rising", keys=["vsync_2p", "2p_vsync"], units="seconds")
