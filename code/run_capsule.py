@@ -97,6 +97,7 @@ def load_traces_h5(h5_file, ps,  h5_key='data', roi_key = 'roi_names', mask_ids 
         mask_ids_array = np.array(mask_ids_list)
 
         # We look for the indice of the mask into the list of packaged masks
+        # This code should crash if it can't find the ROI indice. This is intentional. 
         indices_in_original_table = [np.where(x==mask_ids_array)[0][0] for i, x in enumerate(int_list)]
 
         # We only save the indice of the ROI mask that correspond to the trace. 
