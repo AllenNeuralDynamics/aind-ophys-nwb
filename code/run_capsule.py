@@ -86,19 +86,22 @@ def load_traces_h5(h5_file, ps,  h5_key='data', roi_key = 'roi_names', mask_ids 
         roi_names =  f[roi_key][:]
         
         final_int_list = []
+        
+        # We extract the binary list of trace_id in masks
         int_list = [int(x.decode()) for x in roi_names]
+        
+        # This is the list of ROI that are packaged
         mask_ids_list = list(mask_ids)
-
+        
         # Convert mask_ids_list to a numpy array
         mask_ids_array = np.array(mask_ids_list)
 
-        # Use numpy's searchsorted to get indices, then validate found positions
-        indices = np.searchsorted(mask_ids_array, int_list)
+        # We look for the indice of the mask into the list of packaged masks
+        indices_in_original_table = [np.where(x==mask_ids_array)[0][0] for i, x in enumerate(int_list)]
 
-        final_int_list = list(np.where(mask_ids_array[indices] == int_list, indices, None))
-
+        # We only save the indice of the ROI mask that correspond to the trace. 
         rt_region = ps.create_roi_table_region(
-            region=final_int_list, description="List of measured ROIs"
+            region=indices_in_original_table, description="List of measured ROIs"
         )
 
     return traces, rt_region
