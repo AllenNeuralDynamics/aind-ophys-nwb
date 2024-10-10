@@ -41,6 +41,22 @@ scratch_folder = Path("../scratch/")
 results_folder = Path("../results/")
 
 
+def roi_table_to_pixel_masks_full_image(table, found_metadata):
+    height = found_metadata['fov_height']
+    width = found_metadata['fov_width']
+    masks = []
+    for index, roi in table.iterrows():
+        x0 = roi.x
+        y0 = roi.y
+        full_image_mask = np.zeros((height, width))
+        
+        full_image_mask[x0, y0] = 1
+        
+        # Directly append the width x height array (full_image_mask)
+        masks.append(full_image_mask)
+    return masks
+
+
 def roi_table_to_pixel_masks(table):
     masks = []
     for index, roi in table.iterrows():
@@ -160,16 +176,17 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
             if target+'_'+str(index_plane) == plane_name:
                 found_metadata = indiv_plane_metadata
                 break
-
+        
+        location = "Structure: " + found_metadata['targeted_structure'] + " Depth: " +  str(found_metadata['imaging_depth'])
         imaging_plane = nwbfile.create_imaging_plane(
             name=plane_name, # ophys_plane_id
             optical_channel=optical_channel,
             imaging_rate=float(found_metadata['frame_rate']),
-            description="Two-photon imaging plane",
+            description="Two-photon imaging plane a",
             device=device,
             excitation_lambda=float(session_json_data['data_streams'][0]['light_sources'][0]['wavelength']),
             indicator = subject_json_data['genotype'], 
-            location=found_metadata['targeted_structure'],
+            location=location,
             grid_spacing=[float(found_metadata['fov_scale_factor']), float(found_metadata['fov_scale_factor'])], 
             grid_spacing_unit=found_metadata['fov_coordinate_unit'],
             origin_coords=[0.0, 0.0, 0.0], # TODO: dunno
@@ -192,7 +209,7 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
         # e.g. TimeSeries() (XY translation)
 
         # 4B. Segmentation (can hold multiple plane segmentations)
-        img_seg = ImageSegmentation()
+        img_seg = ImageSegmentation(name="image_segmentation")
 
         
         #img_stack = average_projection[np.newaxis, :, :]
@@ -208,8 +225,8 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
 
         seg_table = pd.DataFrame(load_json(plane_files['segmentation_output_json']))
         ps = img_seg.create_plane_segmentation(
-            name=plane_seg_approach, # TODO: name of segmentation
-            description=plane_seg_descr, # TODO
+            name="cell_specimen_table",
+            description= plane_seg_approach + plane_seg_descr, # TODO
             imaging_plane=imaging_plane,
             # columns = [seg_table.valid_roi.values],
             # colnames = ["valid_roi"]
@@ -230,17 +247,17 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
                              resolution = float(found_metadata['fov_scale_factor']), # pixels/cm 
                              description="Max intensity projection of entire session",)
 
-        images = Images(name="summary_images",
-                        images=[avg_img, max_img],
+        roi_indices = seg_table.id
+        rois_list = roi_table_to_pixel_masks_full_image(seg_table, found_metadata)
+        for pixel_mask in rois_list:
+            ps.add_roi(image_mask=pixel_mask)
+
+        images = Images(name="images",
+                        images=[avg_img, max_img, pixel_mask],
                         description="Summary images of the two-photon movie")
         ophys_module.add(images)
 
         # 4D. ROIS
-        roi_indices = seg_table.id
-        rois_list = roi_table_to_pixel_masks(seg_table)
-        for pixel_mask in rois_list:
-            ps.add_roi(pixel_mask=pixel_mask)
-
         dfof_traces, roi_names = load_traces_h5(plane_files['dff_h5'], ps, mask_ids = roi_indices)
         
         dfof_traces_series = RoiResponseSeries(
@@ -262,7 +279,7 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
 
         neuropil_traces, roi_names = load_traces_h5(plane_files['neuropil_traces_h5'], ps, mask_ids = roi_indices)
         neuropil_traces_series = RoiResponseSeries(
-            name="Neuropil fluorescence",
+            name="neuropil_fluorescence",
             data=neuropil_traces.T,
             rois=roi_names,
             unit="a.u.",
@@ -272,7 +289,7 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
         neuropil_corrected, roi_names = load_traces_h5(plane_files['neuropil_correction_h5'], ps, h5_key='FC', mask_ids = roi_indices)
 
         neuropil_corrected_series = RoiResponseSeries(
-            name="Neuropil corrected",
+            name="neuropil_corrected",
             data=neuropil_corrected.T,
             rois=roi_names,
             unit="a.u.",
@@ -289,7 +306,7 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
             timestamps = found_metadata['timestamps']
             )
 
-        ophys_module.add(DfOverF(roi_response_series=dfof_traces_series))
+        ophys_module.add(DfOverF(roi_response_series=dfof_traces_series, name="dff"))
 
         ophys_module.add(Fluorescence(roi_response_series=roi_traces_series))
         ophys_module.add(neuropil_traces_series)
