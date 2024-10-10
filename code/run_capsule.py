@@ -41,6 +41,16 @@ scratch_folder = Path("../scratch/")
 results_folder = Path("../results/")
 
 
+def overall_segmentation_mask(pixel_masks):
+    height, width = pixel_masks[0].shape  # Get height and width from the first mask
+    full_image_mask = np.zeros((height, width))  # Initialize an empty mask
+    
+    for mask in pixel_masks:
+        full_image_mask = np.logical_or(full_image_mask, mask)  
+
+    
+    return full_image_mask.astype(int)
+
 def roi_table_to_pixel_masks_full_image(table, found_metadata):
     height = found_metadata['fov_height']
     width = found_metadata['fov_width']
@@ -252,8 +262,14 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
         for pixel_mask in rois_list:
             ps.add_roi(image_mask=pixel_mask)
 
+        full_image_mask = overall_segmentation_mask(rois_list)
+        mask_img = GrayscaleImage(name="segmentation_mask_image",
+                            data=full_image_mask,
+                            resolution = float(found_metadata['fov_scale_factor']), # pixels/cm 
+                            description="Segmentation projection of entire session",)
+
         images = Images(name="images",
-                        images=[avg_img, max_img, pixel_mask],
+                        images=[avg_img, max_img, mask_img],
                         description="Summary images of the two-photon movie")
         ophys_module.add(images)
 
