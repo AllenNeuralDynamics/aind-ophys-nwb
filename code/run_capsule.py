@@ -13,6 +13,7 @@ import numpy as np
 from dateutil.tz import tzlocal
 import pandas as pd
 import argparse
+import pynwb
 
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO, NWBFile, TimeSeries
@@ -29,8 +30,15 @@ from pynwb.ophys import (
     TwoPhotonSeries,
 )
 
+from pynwb.file import MultiContainerInterface, NWBContainer, LabMetaData
+from pynwb import register_class
+from hdmf.utils import docval
+
 # aind
 from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
+
+# nwb extension
+from schemas import OphysMetadata
 
 # capsule
 import file_handling
@@ -40,6 +48,11 @@ data_folder = Path("../data/")
 scratch_folder = Path("../scratch/")
 results_folder = Path("../results/")
 
+
+def load_pynwb_extension(schema, path):
+    neurodata_type = "OphysMetadataSchema"
+    pynwb.load_namespaces(path)
+    return pynwb.get_class(neurodata_type, 'ndx-aibs-behavior-ophys')
 
 def overall_segmentation_mask(pixel_masks):
     height, width = pixel_masks[0].shape  # Get height and width from the first mask
@@ -52,15 +65,22 @@ def overall_segmentation_mask(pixel_masks):
     return full_image_mask.astype(int)
 
 def roi_table_to_pixel_masks_full_image(table, found_metadata):
-    height = found_metadata['fov_height']
-    width = found_metadata['fov_width']
+    img_height = found_metadata['fov_height']
+    img_width = found_metadata['fov_width']
     masks = []
     for index, roi in table.iterrows():
         x0 = roi.x
         y0 = roi.y
-        full_image_mask = np.zeros((height, width))
+        if roi.valid_roi == False:
+            continue
+        full_image_mask = np.zeros((img_height, img_width))
         
-        full_image_mask[x0, y0] = 1
+        height = roi.height
+        width = roi.width
+        for i in range(height):
+            for j in range(width):
+                full_image_mask[y0 + i, x0 + j] = int(roi.mask_matrix[i][j])  
+
         
         # Directly append the width x height array (full_image_mask)
         masks.append(full_image_mask)
@@ -110,12 +130,19 @@ def load_traces_h5(h5_file, ps,  h5_key='data', roi_key = 'roi_names', mask_ids 
     with h5py.File(h5_file, "r") as f:
         traces = f[h5_key][:]
         roi_names =  f[roi_key][:]
-        
         final_int_list = []
         
         # We extract the binary list of trace_id in masks
-        int_list = [int(x.decode()) for x in roi_names]
-        
+        int_list = [int(x.decode()) for x in roi_names] 
+        int_list = [i for i in int_list if i in mask_ids]
+
+        # Create a mask for valid int_list entries that are in mask_ids
+        mask = np.isin(int_list, mask_ids)
+
+        # Get valid indices from the mask
+        valid_indices = np.where(mask)[0]
+
+        traces = traces[valid_indices]
         # This is the list of ROI that are packaged
         mask_ids_list = list(mask_ids)
         
@@ -153,7 +180,7 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
     oc1_name = "TODO"
     oc1_desc = "TODO"
     oc1_el = 514.0 # TODO placeholder on Gcamp6 for now emission lambda
-
+    
     # PlaneSegmentation
     plane_seg_approach = "cellpose-mean" # name of individual plane segmentation method
     plane_seg_descr  = "Cellpose with mean intensity projection"
@@ -171,7 +198,9 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
         emission_lambda=oc1_el,
     )
 
+    overall_metadata = {}
     # Start plane specific processing
+    processed_targets = set()
     for plane_name, plane_files in file_paths["planes"].items():
         plane_path = Path(plane_files["processed_plane_path"])
         plane_name = plane_path.name
@@ -180,13 +209,21 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
 
         # Find matching metdata
         found_metadata = {}
+        # Create a set to track combinations of target and index that have been processed
+
         for index_plane, indiv_plane_metadata in enumerate(all_planes_session):
             target = indiv_plane_metadata['targeted_structure']
-            target+'_'+str(index_plane)
-            if target+'_'+str(index_plane) == plane_name:
-                found_metadata = indiv_plane_metadata
-                break
-        
+            target_index = target + '_' + str(indiv_plane_metadata['index'])
+
+            # Check if this target and index combination has been processed already
+            if target_index not in processed_targets:
+                # Check if it matches the metadata structure's index
+                if target_index == indiv_plane_metadata['targeted_structure'] + "_" + str(indiv_plane_metadata['index']):
+                    found_metadata = indiv_plane_metadata
+                    processed_targets.add(target_index)  # Mark this combination as processed
+                    break
+        plane_name = found_metadata['targeted_structure'] + "_" +  str(found_metadata['index'])
+        overall_metadata[plane_name] = found_metadata
         location = "Structure: " + found_metadata['targeted_structure'] + " Depth: " +  str(found_metadata['imaging_depth'])
         imaging_plane = nwbfile.create_imaging_plane(
             name=plane_name, # ophys_plane_id
@@ -256,8 +293,9 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
                              data=max_projection,
                              resolution = float(found_metadata['fov_scale_factor']), # pixels/cm 
                              description="Max intensity projection of entire session",)
-
+        seg_table = seg_table[seg_table['valid_roi']]
         roi_indices = seg_table.id
+        #roi_indices = seg_table.loc[seg_table['valid_roi'], 'id']
         rois_list = roi_table_to_pixel_masks_full_image(seg_table, found_metadata)
         for pixel_mask in rois_list:
             ps.add_roi(image_mask=pixel_mask)
@@ -277,7 +315,7 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
         dfof_traces, roi_names = load_traces_h5(plane_files['dff_h5'], ps, mask_ids = roi_indices)
         
         dfof_traces_series = RoiResponseSeries(
-            name="deltaFoverF",
+            name="dff_timeseries",
             data=dfof_traces.T,
             rois=roi_names,
             unit="%",
@@ -286,7 +324,7 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
 
         roi_traces, roi_names = load_traces_h5(plane_files['roi_traces_h5'], ps, mask_ids = roi_indices)
         roi_traces_series = RoiResponseSeries(
-            name="ROI fluorescence",
+            name="ROI_fluorescence_timeseries",
             data=roi_traces.T,
             rois=roi_names,
             unit="a.u.",
@@ -295,7 +333,7 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
 
         neuropil_traces, roi_names = load_traces_h5(plane_files['neuropil_traces_h5'], ps, mask_ids = roi_indices)
         neuropil_traces_series = RoiResponseSeries(
-            name="neuropil_fluorescence",
+            name="neuropil_fluorescence_timeseries",
             data=neuropil_traces.T,
             rois=roi_names,
             unit="a.u.",
@@ -305,7 +343,7 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
         neuropil_corrected, roi_names = load_traces_h5(plane_files['neuropil_correction_h5'], ps, h5_key='FC', mask_ids = roi_indices)
 
         neuropil_corrected_series = RoiResponseSeries(
-            name="neuropil_corrected",
+            name="neuropil_corrected_timeseries",
             data=neuropil_corrected.T,
             rois=roi_names,
             unit="a.u.",
@@ -315,7 +353,7 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
         event_traces, roi_names = load_traces_h5(plane_files['events_oasis_h5'], ps, h5_key='events', roi_key='cell_roi_id', mask_ids = roi_indices)
 
         event_traces_series = RoiResponseSeries(
-            name="Events",
+            name="event_timeseries",
             data=event_traces.T,
             rois=roi_names,
             unit="a.u.",
@@ -328,8 +366,7 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
         ophys_module.add(neuropil_traces_series)
         ophys_module.add(neuropil_corrected_series)
         ophys_module.add(event_traces_series)
-
-    return nwbfile
+    return nwbfile, overall_metadata
 
 
 def attached_dataset():
@@ -362,6 +399,7 @@ def find_latest_raw_folder():
         raise FileNotFoundError("No raw folder found in /data/")
 
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser(description="Convert ophys dataset to NWB")
     parser.add_argument("--processed_path", type=str, help="Path to the processed ophys session folder", default = r'/data/multiplane-ophys_731327_2024-08-22_14-11-29_processed_2024-09-25_16-28-44')
     parser.add_argument("--raw_path", type=str, help="Path to the raw ophys session folder",default=r'/data/multiplane-ophys_731327_2024-08-22_14-11-29')
@@ -394,9 +432,19 @@ if __name__ == "__main__":
     file_paths["processed_path"] = processed_path
     file_paths["raw_path"] = raw_path
     
+
+    # Construct the primary path
     rig_json_path = os.path.join(raw_path, 'rig.json')
+
+    # Fallback path
+    fallback_path = '/data/rig/rig.json'
+
+    # Check if the primary path exists, otherwise use the fallback
+    if not os.path.exists(rig_json_path):
+        rig_json_path = fallback_path
+
     session_json_path = os.path.join(raw_path, 'session.json')
-    sync_path = list(Path(raw_path).glob(r'pophys/*_sync.h5'))[0]
+    sync_path = list(Path(raw_path).glob(r'pophys/*.h5'))[0]
     subject_json_path = os.path.join(raw_path, 'subject.json')
 
     with open(rig_json_path, 'r') as file:
@@ -445,10 +493,29 @@ if __name__ == "__main__":
         io_class = NWBHDF5IO
         shutil.copyfile(input_nwb_path, result_nwb_path)
     print(f"NWB backend: {NWB_BACKEND}")
-    # make NWB
-    io = io_class(str(result_nwb_path), "r+", load_namespaces=True)
+    OphysMetadata = load_pynwb_extension("", r'/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml')
+    io = io_class(str(result_nwb_path), "r+", load_namespaces=False, extensions=r'/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml')
     nwb_file = io.read()
-    nwbfile = nwb_ophys(nwb_file, file_paths, all_planes_session, rig_json_data, session_json_data, subject_json_data)
+    nwbfile, overall_metadata = nwb_ophys(nwb_file, file_paths, all_planes_session, rig_json_data, session_json_data, subject_json_data)
+
+    depth = ""
+    plane_group = ""
+    field_of_view_width = ""
+    field_of_view_height = ""
+
+    # Add plane metadata for each plane
+    for plane_name, found_metadata in overall_metadata.items():
+        plane_metadata = OphysMetadata(
+            name=f"{plane_name}",
+            imaging_depth=str(found_metadata['imaging_depth']),
+            imaging_plane_group=str(found_metadata['coupled_fov_index']),
+            field_of_view_width=str(found_metadata['fov_width']),
+            field_of_view_height=str(found_metadata['fov_height'])
+        )
+        
+        # Add the lab_metadata to the NWB file
+        nwb_file.add_lab_meta_data(plane_metadata)
+    print(nwb_file)
 
     # write out
     output_path = Path(args.output_path).absolute()
