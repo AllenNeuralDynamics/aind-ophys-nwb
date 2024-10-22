@@ -390,13 +390,16 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
         The path to the latest processed asset in /data/
     """
     # Define a glob pattern to match processed folders in /data/
-    pattern = (
+    capsule_pattern = (
         '^[a-zA-Z-]+[a-zA-Z_-]*_(\d{6})_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})_'
         'processed_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})$'
     )
-    processed_asset = next(input_directory.glob(pattern), None)
+    processed_asset = next(input_directory.glob(capsule_pattern), None)
     if not processed_asset:
-        raise FileNotFoundError("No processed folder found in /data/")
+        try:
+            processed_asset = next(input_directory.glob('processed'))
+        except StopIteration:
+            raise FileNotFoundError("No processed folder found in /data/")
     return processed_asset
 
 # Function to get the latest raw folder
@@ -416,7 +419,10 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
     pattern = '^[a-zA-Z-]+[a-zA-Z_-]*_(\d{6})_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})$'
     raw_asset = next(input_directory.glob(pattern), None)
     if not raw_asset:
-        raise FileNotFoundError("No raw folder found in /data/")
+        try:
+            raw_asset = next(input_directory.glob('raw'))
+        except StopIteration:
+            raise FileNotFoundError("No raw folder found in /data/")
     return raw_asset
 
 if __name__ == "__main__":
