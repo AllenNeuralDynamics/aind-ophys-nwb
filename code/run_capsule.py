@@ -375,38 +375,60 @@ def attached_dataset():
     return processed_path, raw_path
 
 
-def find_latest_processed_folder():
-    # Define a glob pattern to match processed folders in /data/
-    pattern = '/data/*multiplane-ophys*_processed_*'
-    processed_folders = glob.glob(pattern)
+def find_latest_processed_folder(input_directory: Path) -> Path:
+    """
+    Find a processed asset in the /data directory
+    
+    Parameters
+    ----------
+    input_directory : Path
+        The directory to search for processed assets
 
-    if processed_folders:
-        # Sort by modification time and return the latest one
-        return max(processed_folders, key=os.path.getmtime)
-    else:
+    Returns
+    -------
+    Path
+        The path to the latest processed asset in /data/
+    """
+    # Define a glob pattern to match processed folders in /data/
+    pattern = (
+        '^[a-zA-Z-]+[a-zA-Z_-]*_(\d{6})_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})_'
+        'processed_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})$'
+    )
+    processed_asset = next(input_directory.glob(pattern), None)
+    if not processed_asset:
         raise FileNotFoundError("No processed folder found in /data/")
+    return processed_asset
 
 # Function to get the latest raw folder
-def find_latest_raw_folder():
-    # Define a glob pattern to match raw folders in /data/
-    pattern = '/data/*multiplane-ophys*'
-    raw_folders = [folder for folder in glob.glob(pattern) if 'processed' not in folder]
-
-    if raw_folders:
-        # Sort by modification time and return the latest one
-        return max(raw_folders, key=os.path.getmtime)
-    else:
+def find_latest_raw_folder(input_directory: Path) -> Path:
+    """
+    Find a raw asset in the /data directory
+    
+    Parameters
+    ----------
+    input_directory : Path
+        The directory to search for raw assets
+    
+    Returns
+    -------
+    Path
+    """
+    pattern = '^[a-zA-Z-]+[a-zA-Z_-]*_(\d{6})_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})$'
+    raw_asset = next(input_directory.glob(pattern), None)
+    if not raw_asset:
         raise FileNotFoundError("No raw folder found in /data/")
+    return raw_asset
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Convert ophys dataset to NWB")
-    parser.add_argument("--processed_path", type=str, help="Path to the processed ophys session folder", default = r'/data/multiplane-ophys_731327_2024-08-22_14-11-29_processed_2024-09-25_16-28-44')
-    parser.add_argument("--raw_path", type=str, help="Path to the raw ophys session folder",default=r'/data/multiplane-ophys_731327_2024-08-22_14-11-29')
-    parser.add_argument("--output_path", type=str, help="Path to the output file", default="/results/")
+    parser.add_argument("--input-directory", type=str, help="Path to the input directory", default="/data")
+    parser.add_argument("--output_directory", type=str, help="Path to the output file", default="/results")
     parser.add_argument("--run_attached", action='store_true')
     args = parser.parse_args()
-
+    
+    input_directory = Path(args.input_directory)
+    output_directory = Path(args.output_directory)
     # These parameters are used to adjust for mesoscope processing. Later on we can fetch from the data
     nb_group_planes = 4
     nb_planes_per_group = 2
@@ -417,7 +439,7 @@ if __name__ == "__main__":
 
     input_nwb_path = input_nwb_paths[0]
 
-    processed_path = find_latest_processed_folder()
+    processed_path = find_latest_processed_folder(parser.input_directory)
     raw_path = find_latest_raw_folder()
     # file handling & build dict for well known data files
 
@@ -518,6 +540,6 @@ if __name__ == "__main__":
     print(nwb_file)
 
     # write out
-    output_path = Path(args.output_path).absolute()
-    print(f"Writing to {output_path}")
+    output_directory = Path(args.output_directory).absolute()
+    print(f"Writing to {output_directory}")
     io.write(nwb_file)
