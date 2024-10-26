@@ -166,11 +166,17 @@ def df_col_to_array(df:pd.DataFrame, col:str)->np.ndarray:
 
 def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data, session_json_data, subject_json_data):
 
-    # NOTE: could grab= session start time from _json
+    #session_name = raw_path.name
+    #dt = "_".join(session_name.split("_")[-2:])
+    #converted_dt = datetime.strptime(dt, "%Y-%m-%d_%H-%M-%S").astimezone(tzlocal())
+
     raw_path = Path(file_paths["raw_path"])
-    session_name = raw_path.name
-    dt = "_".join(session_name.split("_")[-2:])
-    converted_dt = datetime.strptime(dt, "%Y-%m-%d_%H-%M-%S").astimezone(tzlocal())
+    session_json_path = raw_path / "session.json"
+
+    # Read the session.json file and extract the session_start_time
+    with session_json_path.open("r") as file:
+        session_data = json.load(file)
+        session_start_time_str = session_data.get("session_start_time")
 
     # microscope
     microscope_name = session_json_data['rig_id']
