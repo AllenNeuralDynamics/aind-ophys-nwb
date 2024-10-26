@@ -428,7 +428,7 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Convert ophys dataset to NWB")
-    parser.add_argument("--input-directory", type=str, help="Path to the input directory", default="/data")
+    parser.add_argument("--input_directory", type=str, help="Path to the input directory", default="/data")
     parser.add_argument("--output_directory", type=str, help="Path to the output file", default="/results")
     parser.add_argument("--run_attached", action='store_true')
     args = parser.parse_args()
@@ -445,7 +445,7 @@ if __name__ == "__main__":
 
     input_nwb_path = input_nwb_paths[0]
 
-    processed_path = find_latest_processed_folder(parser.input_directory)
+    processed_path = find_latest_processed_folder(args.input_directory)
     raw_path = find_latest_raw_folder()
     # file handling & build dict for well known data files
 
