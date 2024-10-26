@@ -7,6 +7,7 @@ import h5py
 import shutil
 import glob
 import os 
+import re
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -389,18 +390,21 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
     Path
         The path to the latest processed asset in /data/
     """
-    # Define a glob pattern to match processed folders in /data/
-    capsule_pattern = (
-        '^[a-zA-Z-]+[a-zA-Z_-]*_(\d{6})_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})_'
-        'processed_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})$'
-    )
-    processed_asset = next(input_directory.glob(capsule_pattern), None)
-    if not processed_asset:
-        try:
-            processed_asset = next(input_directory.glob('processed'))
-        except StopIteration:
-            raise FileNotFoundError("No processed folder found in /data/")
-    return processed_asset
+    # Ensure input_directory is a Path object
+    input_directory = Path(input_directory)
+    print(input_directory)
+
+    # Search for folders that contain "multiplane-ophys" and "processed" in the name
+    for folder in input_directory.glob('*'):
+        if folder.is_dir() and "multiplane-ophys" in folder.name and "processed" in folder.name:
+            return folder
+    
+    # If no folder matches, look for a general 'raw' folder as fallback
+    proc_asset = next(input_directory.glob('processed'), None)
+    if proc_asset and proc_asset.is_dir():
+        return proc_asset
+
+    raise FileNotFoundError("No matching processed folder found in the input directory.")
 
 # Function to get the latest raw folder
 def find_latest_raw_folder(input_directory: Path) -> Path:
@@ -416,14 +420,20 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
     -------
     Path
     """
-    pattern = '^[a-zA-Z-]+[a-zA-Z_-]*_(\d{6})_(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})$'
-    raw_asset = next(input_directory.glob(pattern), None)
-    if not raw_asset:
-        try:
-            raw_asset = next(input_directory.glob('raw'))
-        except StopIteration:
-            raise FileNotFoundError("No raw folder found in /data/")
-    return raw_asset
+    # Ensure input_directory is a Path object
+    input_directory = Path(input_directory)
+
+    # Search for folders that contain "multiplane-ophys" but not "processed" in the name
+    for folder in input_directory.glob('*'):
+        if folder.is_dir() and "multiplane-ophys" in folder.name and "processed" not in folder.name:
+            return folder
+
+    # If no folder matches, look for a general 'raw' folder as fallback
+    raw_asset = next(input_directory.glob('raw'), None)
+    if raw_asset and raw_asset.is_dir():
+        return raw_asset
+
+    raise FileNotFoundError("No matching raw folder found in the input directory.")
 
 if __name__ == "__main__":
 
@@ -446,7 +456,7 @@ if __name__ == "__main__":
     input_nwb_path = input_nwb_paths[0]
 
     processed_path = find_latest_processed_folder(args.input_directory)
-    raw_path = find_latest_raw_folder()
+    raw_path = find_latest_raw_folder(args.input_directory)
     # file handling & build dict for well known data files
 
     processed_plane_paths = file_handling.plane_paths_from_session(processed_path, data_level = "processed")
