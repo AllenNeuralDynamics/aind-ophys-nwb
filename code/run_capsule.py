@@ -457,7 +457,7 @@ if __name__ == "__main__":
 
     input_nwb_paths = list(data_folder.glob(r'nwb/*.nwb'))
     if len(input_nwb_paths) != 1:
-        print("enter only 1 nwb!")
+        raise AssertionError("enter only 1 nwb!")
 
     input_nwb_path = input_nwb_paths[0]
 
