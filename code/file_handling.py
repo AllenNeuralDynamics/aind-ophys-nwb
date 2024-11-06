@@ -35,7 +35,7 @@ MULTIPLANE_FILE_PARTS = {"processing_json": "processing.json",
                            "average_projection_png": "_average_projection.png",
                            "max_projection_png": "_maximum_projection.png",
                            "motion_transform_csv": "_motion_transform.csv",
-                           "extraction_h5": "_extraction.h5",
+                           "extraction_h5": "extraction.h5",
                            "dff_h5": "dff.h5",
                            "extract_traces_json": "extract_traces.json",
                            "events_oasis_h5": "events_oasis.h5"}
@@ -46,6 +46,7 @@ def multiplane_session_data_files(input_path):
     input_path = Path(input_path)
     data_files = {}
     for key, value in MULTIPLANE_FILE_PARTS.items():
+        print(key, value)
         data_files[key] = find_data_file(input_path, value)
     return data_files
 
