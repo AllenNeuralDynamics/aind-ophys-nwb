@@ -339,9 +339,10 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
         # 4D. ROIS
         
         rois_shape = load_generic_group(plane_files['extraction_h5'], h5_group="rois", h5_key="shape")
-        x = load_sparse_array(plane_files['extraction_h5'])
-        for pixel_mask in range(int(rois_shape[0])):
-            ps.add_roi(image_mask=np.zeros((512,512)))
+        
+        for pixel_mask in load_sparse_array(plane_files['extraction_h5']):
+            
+            ps.add_roi(image_mask=pixel_mask)
 
         roi_traces, roi_names = load_signals(plane_files['extraction_h5'], ps, h5_group="traces", h5_key="roi")
         roi_traces_series = RoiResponseSeries(
