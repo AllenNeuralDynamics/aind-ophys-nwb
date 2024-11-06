@@ -8,6 +8,7 @@ import shutil
 import glob
 import os 
 import re
+import sparse
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -179,10 +180,20 @@ def load_generic_group(h5_file: Path, h5_group=None, h5_key=None) -> np.array:
     (np.array)
         Segmentation masks on full image
     """
+    print("h5", h5_file)
     with h5py.File(h5_file, "r") as f:
         masks = f[h5_group][h5_key][:]
     
     return masks
+
+def load_sparse_array(h5_file):
+    with h5py.File(h5_file) as f:
+        data = f["rois"]["data"][:]
+        coords = f["rois"]["coords"][:]
+        shape = f["rois"]["shape"][:]
+
+    pixelmasks = sparse.COO(coords,data,shape).todense()
+    return pixelmasks
 
 def df_col_to_array(df:pd.DataFrame, col:str)->np.ndarray:
     return np.stack(df[col].values)
@@ -312,6 +323,8 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
                              resolution = float(found_metadata['fov_scale_factor']), # pixels/cm 
                              description="Max intensity projection of entire session",)
         
+        print(plane_files)
+        print(plane_files['extraction_h5'])
         segmetation_mask = load_generic_group(plane_files['extraction_h5'], h5_group="cellpose", h5_key="masks")
         mask_img = GrayscaleImage(name="segmentation_mask_image",
                             data=segmetation_mask,
@@ -326,6 +339,7 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
         # 4D. ROIS
         
         rois_shape = load_generic_group(plane_files['extraction_h5'], h5_group="rois", h5_key="shape")
+        x = load_sparse_array(plane_files['extraction_h5'])
         for pixel_mask in range(int(rois_shape[0])):
             ps.add_roi(image_mask=np.zeros((512,512)))
 
@@ -463,8 +477,8 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Convert ophys dataset to NWB")
-    parser.add_argument("--input_directory", type=str, help="Path to the input directory", default="../data/")
-    parser.add_argument("--output_directory", type=str, help="Path to the output file", default="../results/")
+    parser.add_argument("--input_directory", type=str, help="Path to the input directory", default="data/")
+    parser.add_argument("--output_directory", type=str, help="Path to the output file", default="results/")
     parser.add_argument("--run_attached", action='store_true')
     args = parser.parse_args()
     
@@ -507,7 +521,11 @@ if __name__ == "__main__":
         rig_json_path = fallback_path
 
     session_json_path = os.path.join(raw_path, 'session.json')
-    sync_path = list(Path(raw_path).glob(r'pophys/*.h5'))[0]
+    try: 
+        sync_path = list(Path(raw_path).glob(r'pophys/*.h5'))[0]
+    except Exception:
+        print(processed_path)
+        sync_path = list(Path(processed_path).glob(r'*.h5'))[0]
     subject_json_path = os.path.join(raw_path, 'subject.json')
 
     with open(rig_json_path, 'r') as file:
@@ -556,8 +574,8 @@ if __name__ == "__main__":
         io_class = NWBHDF5IO
         shutil.copyfile(input_nwb_path, result_nwb_path)
     print(f"NWB backend: {NWB_BACKEND}")
-    OphysMetadata = load_pynwb_extension("", r'data/schemas/ndx-aibs-behavior-ophys.namespace.yaml')    
-    io = io_class(str(result_nwb_path), "r+", load_namespaces=False, extensions=r'data/schemas/ndx-aibs-behavior-ophys.namespace.yaml')
+    OphysMetadata = load_pynwb_extension("", r'/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml')    
+    io = io_class(str(result_nwb_path), "r+", load_namespaces=False, extensions=r'/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml')
     nwb_file = io.read()
     nwbfile, overall_metadata = nwb_ophys(nwb_file, file_paths, all_planes_session, rig_json_data, session_json_data, subject_json_data)
 
