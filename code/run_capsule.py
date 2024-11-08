@@ -485,9 +485,6 @@ if __name__ == "__main__":
     
     input_directory = Path(args.input_directory)
     output_directory = Path(args.output_directory)
-    # These parameters are used to adjust for mesoscope processing. Later on we can fetch from the data
-    nb_group_planes = 4
-    nb_planes_per_group = 2
 
     input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
     if len(input_nwb_paths) != 1:
@@ -497,7 +494,14 @@ if __name__ == "__main__":
 
     processed_path = find_latest_processed_folder(args.input_directory)
     raw_path = find_latest_raw_folder(args.input_directory)
-    # file handling & build dict for well known data files
+
+    # There are only plane subfolders in the processed asset 
+    # So we can assume that each subfolder represents a plane
+    nb_planes = len([item for item in Path(processed_path).iterdir() if item.is_dir()])
+
+    # Planes are paired, so we only want to get half of them
+    nb_planes_per_group = 2
+    nb_group_planes = nb_planes / nb_planes_per_group        
 
     processed_plane_paths = file_handling.plane_paths_from_session(processed_path, data_level = "processed")
     file_paths = {}
