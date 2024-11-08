@@ -154,6 +154,7 @@ def load_signals(h5_file: Path, ps: ImageSegmentation, h5_group=None, h5_key=Non
         with h5py.File(h5_file, "r") as f:
             traces = f[h5_group][h5_key][:]
     index = traces.shape[0]
+
     roi_names = np.arange(index).tolist()
     rt_region = ps.create_roi_table_region(
             region=roi_names, description="List of measured ROIs"
@@ -338,9 +339,10 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
         # 4D. ROIS
         
         rois_shape = load_generic_group(plane_files['extraction_h5'], h5_group="rois", h5_key="shape")
-        x = load_sparse_array(plane_files['extraction_h5'])
-        for pixel_mask in range(int(rois_shape[0])):
-            ps.add_roi(image_mask=np.zeros((512,512)))
+        
+        for pixel_mask in load_sparse_array(plane_files['extraction_h5']):
+            
+            ps.add_roi(image_mask=pixel_mask)
 
         roi_traces, roi_names = load_signals(plane_files['extraction_h5'], ps, h5_group="traces", h5_key="roi")
         roi_traces_series = RoiResponseSeries(
@@ -351,6 +353,8 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
             timestamps = found_metadata['timestamps']
             )
         
+        assert roi_traces.shape[0] == int(rois_shape[0]), "Mismatch in number of ROIs and traces"
+
         neuropil_traces, roi_names = load_signals(plane_files['extraction_h5'], ps, h5_group="traces", h5_key="neuropil")
         neuropil_traces_series = RoiResponseSeries(
             name="neuropil_fluorescence_timeseries",
@@ -360,6 +364,8 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
             timestamps = found_metadata['timestamps']
             )
         
+        assert neuropil_traces.shape[0] == int(rois_shape[0]), "Mismatch in number of ROIs and traces"
+
         neuropil_corrected, roi_names = load_signals(plane_files['extraction_h5'], ps, h5_group="traces", h5_key="corrected")
         neuropil_corrected_series = RoiResponseSeries(
             name="neuropil_corrected_timeseries",
@@ -369,7 +375,8 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
             timestamps = found_metadata['timestamps']
             )
 
-            
+        assert neuropil_corrected.shape[0] == int(rois_shape[0]), "Mismatch in number of ROIs and traces"
+
         dfof_traces, roi_names = load_signals(plane_files['dff_h5'], ps, h5_key = "data")
         
         dfof_traces_series = RoiResponseSeries(
@@ -380,6 +387,8 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
             timestamps = found_metadata['timestamps']
             )
         
+        assert dfof_traces.shape[0] == int(rois_shape[0]), "Mismatch in number of ROIs and traces"
+
         event_traces, roi_names = load_signals(plane_files['events_oasis_h5'], ps, h5_key='events',)
 
         event_traces_series = RoiResponseSeries(
@@ -389,6 +398,8 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
             unit="a.u.",
             timestamps = found_metadata['timestamps']
             )
+
+        assert event_traces.shape[0] == int(rois_shape[0]), "Mismatch in number of ROIs and traces"
 
         ophys_module.add(DfOverF(roi_response_series=dfof_traces_series, name="dff"))
 
