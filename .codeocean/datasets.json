@@ -1,0 +1,21 @@
+{
+	"version": 1,
+	"attached_datasets": [
+		{
+			"id": "2ae77b46-4181-4784-a566-ed124c573477",
+			"mount": "nwb"
+		},
+		{
+			"id": "56b00205-387b-44f8-926c-abfefe52ab4a",
+			"mount": "multiplane-ophys_731327_2024-08-21_14-38-32"
+		},
+		{
+			"id": "9fe5c0b8-2a5d-49a7-bb1b-9ac68d0da333",
+			"mount": "multiplane-ophys_731327_2024-08-21_14-38-32_processed_2024-11-01_08-42-49"
+		},
+		{
+			"id": "fb4b5cef-4505-4145-b8bd-e41d6863d7a9",
+			"mount": "schemas"
+		}
+	]
+}

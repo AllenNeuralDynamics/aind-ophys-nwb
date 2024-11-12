@@ -8,6 +8,7 @@ import shutil
 import glob
 import os 
 import re
+import sparse
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -127,39 +128,72 @@ def load_json(fp):
         j = json.load(f)
     return j
 
-def load_traces_h5(h5_file, ps,  h5_key='data', roi_key = 'roi_names', mask_ids = []): 
-    with h5py.File(h5_file, "r") as f:
-        traces = f[h5_key][:]
-        roi_names =  f[roi_key][:]
-        final_int_list = []
-        
-        # We extract the binary list of trace_id in masks
-        int_list = [int(x.decode()) for x in roi_names] 
-        int_list = [i for i in int_list if i in mask_ids]
+def load_signals(h5_file: Path, ps: ImageSegmentation, h5_group=None, h5_key=None) -> tuple:
+    """Loads extracted signal data from aind-ophys-extraction-suite2p
 
-        # Create a mask for valid int_list entries that are in mask_ids
-        mask = np.isin(int_list, mask_ids)
+    Parameters
+    ----------
+    h5_file: Path
+        Path to h5_file
+    ps: ImageSegmentation
+        nwb segmented object
+    h5_group: str
+        Group to access key in h5 file
+    h5_key: str
+        Key to extract data from
+    
+    Returns
+    -------
+    (np.array, ImageSegmentation)
+        Trace array and updated segmentation object
+    """
+    if not h5_group:
+        with h5py.File(h5_file, "r") as f:
+            traces = f[h5_key][:]
+    else:
+        with h5py.File(h5_file, "r") as f:
+            traces = f[h5_group][h5_key][:]
+    index = traces.shape[0]
 
-        # Get valid indices from the mask
-        valid_indices = np.where(mask)[0]
-
-        traces = traces[valid_indices]
-        # This is the list of ROI that are packaged
-        mask_ids_list = list(mask_ids)
-        
-        # Convert mask_ids_list to a numpy array
-        mask_ids_array = np.array(mask_ids_list)
-
-        # We look for the indice of the mask into the list of packaged masks
-        # This code should crash if it can't find the ROI indice. This is intentional. 
-        indices_in_original_table = [np.where(x==mask_ids_array)[0][0] for i, x in enumerate(int_list)]
-
-        # We only save the indice of the ROI mask that correspond to the trace. 
-        rt_region = ps.create_roi_table_region(
-            region=indices_in_original_table, description="List of measured ROIs"
+    roi_names = np.arange(index).tolist()
+    rt_region = ps.create_roi_table_region(
+            region=roi_names, description="List of measured ROIs"
         )
 
     return traces, rt_region
+
+
+def load_generic_group(h5_file: Path, h5_group=None, h5_key=None) -> np.array:
+    """Loads extracted signal data from aind-ophys-extraction-suite2p
+
+    Parameters
+    ----------
+    h5_file: Path
+        Path to h5_file
+    h5_group: str
+        Group to access key in h5 file
+    h5_key: str
+        Key to extract data from
+    
+    Returns
+    -------
+    (np.array)
+        Segmentation masks on full image
+    """
+    print("h5", h5_file)
+    with h5py.File(h5_file, "r") as f:
+        masks = f[h5_group][h5_key][:]
+    
+    return masks
+
+def load_sparse_array(h5_file):
+    with h5py.File(h5_file) as f:
+        data = f["rois"]["data"][:]
+        coords = f["rois"]["coords"][:]
+        shape = f["rois"]["shape"][:]
+
+    pixelmasks = sparse.COO(coords,data,shape).todense()
+    return pixelmasks
 
 def df_col_to_array(df:pd.DataFrame, col:str)->np.ndarray:
     return np.stack(df[col].values)
@@ -264,20 +298,8 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
 
         # 4B. Segmentation (can hold multiple plane segmentations)
         img_seg = ImageSegmentation(name="image_segmentation")
-
         
-        #img_stack = average_projection[np.newaxis, :, :]
-        # avg_projection = ImageSeries(
-        #     name="average_intensity_projection",
-        #     data=img_stack,
-        #     format="raw",
-        #     unit="float32",
-        #     rate = 0.0,
-        # )
-
         
-
-        seg_table = pd.DataFrame(load_json(plane_files['segmentation_output_json']))
         ps = img_seg.create_plane_segmentation(
             name="cell_specimen_table",
             description= plane_seg_approach + plane_seg_descr, # TODO
@@ -300,16 +322,12 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
                              data=max_projection,
                              resolution = float(found_metadata['fov_scale_factor']), # pixels/cm 
                              description="Max intensity projection of entire session",)
-        seg_table = seg_table[seg_table['valid_roi']]
-        roi_indices = seg_table.id
-        #roi_indices = seg_table.loc[seg_table['valid_roi'], 'id']
-        rois_list = roi_table_to_pixel_masks_full_image(seg_table, found_metadata)
-        for pixel_mask in rois_list:
-            ps.add_roi(image_mask=pixel_mask)
-
-        full_image_mask = overall_segmentation_mask(rois_list)
+        
+        print(plane_files)
+        print(plane_files['extraction_h5'])
+        segmetation_mask = load_generic_group(plane_files['extraction_h5'], h5_group="cellpose", h5_key="masks")
         mask_img = GrayscaleImage(name="segmentation_mask_image",
-                            data=full_image_mask,
+                            data=segmetation_mask,
                             resolution = float(found_metadata['fov_scale_factor']), # pixels/cm 
                             description="Segmentation projection of entire session",)
 
@@ -319,17 +337,14 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
         ophys_module.add(images)
 
         # 4D. ROIS
-        dfof_traces, roi_names = load_traces_h5(plane_files['dff_h5'], ps, mask_ids = roi_indices)
         
-        dfof_traces_series = RoiResponseSeries(
-            name="dff_timeseries",
-            data=dfof_traces.T,
-            rois=roi_names,
-            unit="%",
-            timestamps = found_metadata['timestamps']
-            )
+        rois_shape = load_generic_group(plane_files['extraction_h5'], h5_group="rois", h5_key="shape")
+        
+        for pixel_mask in load_sparse_array(plane_files['extraction_h5']):
+            
+            ps.add_roi(image_mask=pixel_mask)
 
-        roi_traces, roi_names = load_traces_h5(plane_files['roi_traces_h5'], ps, mask_ids = roi_indices)
+        roi_traces, roi_names = load_signals(plane_files['extraction_h5'], ps, h5_group="traces", h5_key="roi")
         roi_traces_series = RoiResponseSeries(
             name="ROI_fluorescence_timeseries",
             data=roi_traces.T,
@@ -337,8 +352,10 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
             unit="a.u.",
             timestamps = found_metadata['timestamps']
             )
+        
+        assert roi_traces.shape[0] == int(rois_shape[0]), "Mismatch in number of ROIs and traces"
 
-        neuropil_traces, roi_names = load_traces_h5(plane_files['neuropil_traces_h5'], ps, mask_ids = roi_indices)
+        neuropil_traces, roi_names = load_signals(plane_files['extraction_h5'], ps, h5_group="traces", h5_key="neuropil")
         neuropil_traces_series = RoiResponseSeries(
             name="neuropil_fluorescence_timeseries",
             data=neuropil_traces.T,
@@ -346,9 +363,10 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
             unit="a.u.",
             timestamps = found_metadata['timestamps']
             )
+        
+        assert neuropil_traces.shape[0] == int(rois_shape[0]), "Mismatch in number of ROIs and traces"
 
-        neuropil_corrected, roi_names = load_traces_h5(plane_files['neuropil_correction_h5'], ps, h5_key='FC', mask_ids = roi_indices)
-
+        neuropil_corrected, roi_names = load_signals(plane_files['extraction_h5'], ps, h5_group="traces", h5_key="corrected")
         neuropil_corrected_series = RoiResponseSeries(
             name="neuropil_corrected_timeseries",
             data=neuropil_corrected.T,
@@ -357,7 +375,21 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
             timestamps = found_metadata['timestamps']
             )
 
-        event_traces, roi_names = load_traces_h5(plane_files['events_oasis_h5'], ps, h5_key='events', roi_key='cell_roi_id', mask_ids = roi_indices)
+        assert neuropil_corrected.shape[0] == int(rois_shape[0]), "Mismatch in number of ROIs and traces"
+
+        dfof_traces, roi_names = load_signals(plane_files['dff_h5'], ps, h5_key = "data")
+        
+        dfof_traces_series = RoiResponseSeries(
+            name="dff_timeseries",
+            data=dfof_traces.T,
+            rois=roi_names,
+            unit="%",
+            timestamps = found_metadata['timestamps']
+            )
+        
+        assert dfof_traces.shape[0] == int(rois_shape[0]), "Mismatch in number of ROIs and traces"
+
+        event_traces, roi_names = load_signals(plane_files['events_oasis_h5'], ps, h5_key='events',)
 
         event_traces_series = RoiResponseSeries(
             name="event_timeseries",
@@ -366,6 +398,8 @@ def nwb_ophys(nwbfile, file_paths: dict, all_planes_session: list, rig_json_data
             unit="a.u.",
             timestamps = found_metadata['timestamps']
             )
+
+        assert event_traces.shape[0] == int(rois_shape[0]), "Mismatch in number of ROIs and traces"
 
         ophys_module.add(DfOverF(roi_response_series=dfof_traces_series, name="dff"))
 
@@ -444,26 +478,30 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Convert ophys dataset to NWB")
-    parser.add_argument("--input_directory", type=str, help="Path to the input directory", default="/data")
-    parser.add_argument("--output_directory", type=str, help="Path to the output file", default="/results")
+    parser.add_argument("--input_directory", type=str, help="Path to the input directory", default="/data/")
+    parser.add_argument("--output_directory", type=str, help="Path to the output file", default="/results/")
     parser.add_argument("--run_attached", action='store_true')
     args = parser.parse_args()
     
     input_directory = Path(args.input_directory)
     output_directory = Path(args.output_directory)
-    # These parameters are used to adjust for mesoscope processing. Later on we can fetch from the data
-    nb_group_planes = 4
-    nb_planes_per_group = 2
 
-    input_nwb_paths = list(data_folder.glob(r'nwb/*.nwb'))
+    input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
     if len(input_nwb_paths) != 1:
-        print("enter only 1 nwb!")
+        raise AssertionError("enter only 1 nwb!")
 
     input_nwb_path = input_nwb_paths[0]
 
     processed_path = find_latest_processed_folder(args.input_directory)
     raw_path = find_latest_raw_folder(args.input_directory)
-    # file handling & build dict for well known data files
+
+    # There are only plane subfolders in the processed asset 
+    # So we can assume that each subfolder represents a plane
+    nb_planes = len([item for item in Path(processed_path).iterdir() if item.is_dir()])
+
+    # Planes are paired, so we only want to get half of them
+    nb_planes_per_group = 2
+    nb_group_planes = nb_planes / nb_planes_per_group        
 
     processed_plane_paths = file_handling.plane_paths_from_session(processed_path, data_level = "processed")
     file_paths = {}
@@ -488,7 +526,11 @@ if __name__ == "__main__":
         rig_json_path = fallback_path
 
     session_json_path = os.path.join(raw_path, 'session.json')
-    sync_path = list(Path(raw_path).glob(r'pophys/*.h5'))[0]
+    try: 
+        sync_path = list(Path(raw_path).glob(r'pophys/*.h5'))[0]
+    except Exception:
+        print(processed_path)
+        sync_path = list(Path(processed_path).glob(r'*.h5'))[0]
     subject_json_path = os.path.join(raw_path, 'subject.json')
 
     with open(rig_json_path, 'r') as file:
@@ -526,7 +568,7 @@ if __name__ == "__main__":
             all_planes_session[index_plane]['timestamps'] = timestamps[plane_group::nb_group_planes]
 
     # determine if file is zarr or hdf5, and copy it to results
-    result_nwb_path = results_folder / input_nwb_path.name
+    result_nwb_path = output_directory / input_nwb_path.name
     if input_nwb_path.is_dir():
         assert (input_nwb_path / ".zattrs").is_file(), f"{input_nwb_path.name} is not a valid Zarr folder"
         NWB_BACKEND = "zarr"
@@ -537,7 +579,7 @@ if __name__ == "__main__":
         io_class = NWBHDF5IO
         shutil.copyfile(input_nwb_path, result_nwb_path)
     print(f"NWB backend: {NWB_BACKEND}")
-    OphysMetadata = load_pynwb_extension("", r'/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml')
+    OphysMetadata = load_pynwb_extension("", r'/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml')    
     io = io_class(str(result_nwb_path), "r+", load_namespaces=False, extensions=r'/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml')
     nwb_file = io.read()
     nwbfile, overall_metadata = nwb_ophys(nwb_file, file_paths, all_planes_session, rig_json_data, session_json_data, subject_json_data)
