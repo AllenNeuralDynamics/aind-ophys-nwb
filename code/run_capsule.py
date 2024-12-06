@@ -531,8 +531,8 @@ if __name__ == "__main__":
         sync_path = list(Path(raw_path).glob(r'pophys/*.h5'))[0]
     except Exception:
         print(processed_path)
-
-     try:   
+    
+    try:   
         sync_path = list(Path(processed_path).glob(r'*.h5'))[0]
     except Exception:
         sync_path = list(Path(raw_path).glob(r'behavior/*.h5'))[0]        
