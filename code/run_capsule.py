@@ -501,7 +501,8 @@ if __name__ == "__main__":
 
     # Planes are paired, so we only want to get half of them
     nb_planes_per_group = 2
-    nb_group_planes = nb_planes / nb_planes_per_group        
+    nb_group_planes = nb_planes / nb_planes_per_group  
+    nb_group_planes = int(nb_group_planes)
 
     processed_plane_paths = file_handling.plane_paths_from_session(processed_path, data_level = "processed")
     file_paths = {}
@@ -530,7 +531,12 @@ if __name__ == "__main__":
         sync_path = list(Path(raw_path).glob(r'pophys/*.h5'))[0]
     except Exception:
         print(processed_path)
+
+     try:   
         sync_path = list(Path(processed_path).glob(r'*.h5'))[0]
+    except Exception:
+        sync_path = list(Path(raw_path).glob(r'behavior/*.h5'))[0]        
+
     subject_json_path = os.path.join(raw_path, 'subject.json')
 
     with open(rig_json_path, 'r') as file:
@@ -554,8 +560,6 @@ if __name__ == "__main__":
     sync_dataset = sync.load_sync(sync_path)
     timestamps = sync.get_edges(sync_file=sync_dataset, kind="rising", keys=["vsync_2p", "2p_vsync"], units="seconds")
 
-    nb_group_planes = 4
-    nb_planes_per_group = 2
 
     for plane_group in range(nb_group_planes):
         for indiv_plane_in_group in range(nb_planes_per_group):
