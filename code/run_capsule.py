@@ -533,7 +533,7 @@ if __name__ == "__main__":
         print(processed_path)
     
     try:   
-        sync_path = list(Path(processed_path).glob(r'*.h5'))[0]
+        sync_path = list(Path(raw_path).glob(r'*.h5'))[0]
     except Exception:
         sync_path = list(Path(raw_path).glob(r'behavior/*.h5'))[0]        
 
