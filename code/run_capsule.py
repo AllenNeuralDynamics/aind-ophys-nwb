@@ -1,5 +1,4 @@
 import argparse
-import glob
 import json
 import os
 import shutil
@@ -250,24 +249,13 @@ def nwb_ophys(
         found_metadata = {}
         # Create a set to track combinations of target and index that have been processed
 
-        for index_plane, indiv_plane_metadata in enumerate(all_planes_session):
-            target = indiv_plane_metadata["targeted_structure"]
-            target_index = target + "_" + str(indiv_plane_metadata["index"])
-
-            # Check if this target and index combination has been processed already
-            if target_index not in processed_targets:
-                # Check if it matches the metadata structure's index
-                if target_index == indiv_plane_metadata[
-                    "targeted_structure"
-                ] + "_" + str(indiv_plane_metadata["index"]):
-                    found_metadata = indiv_plane_metadata
-                    processed_targets.add(
-                        target_index
-                    )  # Mark this combination as processed
-                    break
-        plane_name = (
-            found_metadata["targeted_structure"] + "_" + str(found_metadata["index"])
-        )
+        targeted_structure = plane_name.split("_")[0]
+        index = int(plane_name.split("_")[1])
+        for fov in all_planes_session:
+            if fov["targeted_structure"] == targeted_structure and fov["index"] == index:
+                found_metadata = fov
+                break
+        print(f"Found metadata: {found_metadata}")
         overall_metadata[plane_name] = found_metadata
         location = (
             "Structure: "
