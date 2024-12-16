@@ -1,50 +1,35 @@
-from datetime import datetime
-from uuid import uuid4
-from pathlib import Path
-from typing import Union
-import json
-import h5py
-import shutil
+import argparse
 import glob
+import json
 import os
 import re
-import sparse
-
-import matplotlib.pyplot as plt
-import numpy as np
-from dateutil.tz import tzlocal
-import pandas as pd
-import argparse
-import pynwb
-
-from hdmf_zarr import NWBZarrIO
-from pynwb import NWBHDF5IO, NWBFile, TimeSeries
-from pynwb.image import Images, ImageSeries, GrayscaleImage
-from pynwb.ophys import (
-    CorrectedImageStack,
-    Fluorescence,
-    DfOverF,
-    ImageSegmentation,
-    MotionCorrection,
-    OnePhotonSeries,
-    OpticalChannel,
-    RoiResponseSeries,
-    TwoPhotonSeries,
-)
-
-from pynwb.file import MultiContainerInterface, NWBContainer, LabMetaData
-from pynwb import register_class
-from hdmf.utils import docval
-
-# aind
-from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
-
-# nwb extension
-from schemas import OphysMetadata
+import shutil
+from datetime import datetime
+from pathlib import Path
+from typing import Union
+from uuid import uuid4
 
 # capsule
 import file_handling
-
+import h5py
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pynwb
+import sparse
+# aind
+from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
+from dateutil.tz import tzlocal
+from hdmf.utils import docval
+from hdmf_zarr import NWBZarrIO
+from pynwb import NWBHDF5IO, NWBFile, TimeSeries, register_class
+from pynwb.file import LabMetaData, MultiContainerInterface, NWBContainer
+from pynwb.image import GrayscaleImage, Images, ImageSeries
+from pynwb.ophys import (CorrectedImageStack, DfOverF, Fluorescence,
+                         ImageSegmentation, MotionCorrection, OnePhotonSeries,
+                         OpticalChannel, RoiResponseSeries, TwoPhotonSeries)
+# nwb extension
+from schemas import OphysMetadata
 
 data_folder = Path("../data/")
 scratch_folder = Path("../scratch/")
