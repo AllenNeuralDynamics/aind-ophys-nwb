@@ -17,7 +17,7 @@ import sparse
 from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
-from pynwb.image import GrayscaleImage
+from pynwb.image import Images, GrayscaleImage
 from pynwb.ophys import (
     DfOverF,
     Fluorescence,
