@@ -2,12 +2,8 @@ import argparse
 import glob
 import json
 import os
-import re
 import shutil
-from datetime import datetime
 from pathlib import Path
-from typing import Union
-from uuid import uuid4
 
 # capsule
 import file_handling
@@ -17,17 +13,20 @@ import numpy as np
 import pandas as pd
 import pynwb
 import sparse
+
 # aind
 from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
-from dateutil.tz import tzlocal
-from hdmf.utils import docval
 from hdmf_zarr import NWBZarrIO
-from pynwb import NWBHDF5IO, NWBFile, TimeSeries, register_class
-from pynwb.file import LabMetaData, MultiContainerInterface, NWBContainer
-from pynwb.image import GrayscaleImage, Images, ImageSeries
-from pynwb.ophys import (CorrectedImageStack, DfOverF, Fluorescence,
-                         ImageSegmentation, MotionCorrection, OnePhotonSeries,
-                         OpticalChannel, RoiResponseSeries, TwoPhotonSeries)
+from pynwb import NWBHDF5IO
+from pynwb.image import GrayscaleImage
+from pynwb.ophys import (
+    DfOverF,
+    Fluorescence,
+    ImageSegmentation,
+    OpticalChannel,
+    RoiResponseSeries,
+)
+
 # nwb extension
 from schemas import OphysMetadata
 
@@ -258,9 +257,9 @@ def nwb_ophys(
             # Check if this target and index combination has been processed already
             if target_index not in processed_targets:
                 # Check if it matches the metadata structure's index
-                if target_index == indiv_plane_metadata["targeted_structure"] + "_" + str(
-                    indiv_plane_metadata["index"]
-                ):
+                if target_index == indiv_plane_metadata[
+                    "targeted_structure"
+                ] + "_" + str(indiv_plane_metadata["index"]):
                     found_metadata = indiv_plane_metadata
                     processed_targets.add(
                         target_index
@@ -496,7 +495,9 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
     if proc_asset and proc_asset.is_dir():
         return proc_asset
 
-    raise FileNotFoundError("No matching processed folder found in the input directory.")
+    raise FileNotFoundError(
+        "No matching processed folder found in the input directory."
+    )
 
 
 # Function to get the latest raw folder
