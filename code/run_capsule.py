@@ -533,9 +533,9 @@ if __name__ == "__main__":
         print(processed_path)
     
     try:   
-        sync_path = list(Path(raw_path).glob(r'*.h5'))[0]
+        sync_path = list(Path(raw_path).glob(r'behavior/*.h5'))[0]
     except Exception:
-        sync_path = list(Path(raw_path).glob(r'behavior/*.h5'))[0]        
+        sync_path = list(Path(raw_path).glob(r'/*.h5'))[0]        
 
     subject_json_path = os.path.join(raw_path, 'subject.json')
 
