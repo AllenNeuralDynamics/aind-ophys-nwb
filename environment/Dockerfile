@@ -8,6 +8,11 @@ ARG GIT_ASKPASS
 ARG GIT_ACCESS_TOKEN
 COPY git-askpass /
 
+RUN apt-get update
+
+# Install VIM
+RUN apt-get install -y vim
+
 RUN pip install -U --no-cache-dir \
     matplotlib \
     pandas \
