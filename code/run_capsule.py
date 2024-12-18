@@ -12,8 +12,9 @@ import numpy as np
 import pandas as pd
 import pynwb
 import sparse
+import logging
+from typing import Tuple
 
-# aind
 from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
@@ -26,12 +27,7 @@ from pynwb.ophys import (
     RoiResponseSeries,
 )
 
-# nwb extension
 from schemas import OphysMetadata
-
-data_folder = Path("../data/")
-scratch_folder = Path("../scratch/")
-results_folder = Path("../results/")
 
 
 def load_pynwb_extension(schema, path):
@@ -74,7 +70,7 @@ def roi_table_to_pixel_masks_full_image(table, found_metadata):
 
 def roi_table_to_pixel_masks(table):
     masks = []
-    for index, roi in table.iterrows():
+    for _, roi in table.iterrows():
         x0 = roi.x
         y0 = roi.y
         mask_matrix = np.array(roi.mask_matrix)
@@ -89,7 +85,7 @@ def roi_table_to_pixel_masks(table):
 
 def roi_table_to_pixel_masks_OLD(table):
     masks = []
-    for index, roi in table.iterrows():
+    for _, roi in table.iterrows():
         x = roi.x
         y = roi.y
         mask_matrix = roi.mask_matrix
@@ -107,10 +103,24 @@ def roi_table_to_pixel_masks_OLD(table):
     return masks
 
 
-def load_json(fp):
+def load_json(fp: Path) -> dict:
+    """Loads json file from path
+
+    Parameters
+    ----------
+    fp: Path
+        Path to json file
+    
+    Returns
+    -------
+    dict
+        Json file as dictionary
+    """
+    if not fp.is_file():
+        logging.error("File not found: %s", fp)
+        raise FileNotFoundError(f"File not found: {fp}")
     with open(fp, "r") as f:
-        j = json.load(f)
-    return j
+        return json.load(f)
 
 
 def load_signals(
@@ -207,7 +217,6 @@ def nwb_ophys(
     # Read the session.json file and extract the session_start_time
     with session_json_path.open("r") as file:
         session_data = json.load(file)
-        session_start_time_str = session_data.get("session_start_time")
 
     # microscope
     microscope_name = session_json_data["rig_id"]
@@ -520,45 +529,63 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
 
     raise FileNotFoundError("No matching raw folder found in the input directory.")
 
+def get_data_paths(input_directory: Path) -> Tuple[Path, Path, Path]:
+    """ Get the paths to the input NWB file and the processed and raw folders
 
-if __name__ == "__main__":
+    Parameters
+    ----------
+    input_directory : Path
+        The directory containing the NWB file and the processed and raw folders
+    
+    Returns
+    -------
+    Tuple[Path, Path, Path]
+        The paths to the input NWB file, the processed folder, and the raw folder
+    """
+    input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
+    if len(input_nwb_paths) != 1:
+        raise AssertionError("One valid NWB file must be present in the input directory")
+    input_nwb_path = input_nwb_paths[0]
+    processed_path = find_latest_processed_folder(args.input_directory)
+    raw_path = find_latest_raw_folder(args.input_directory)
+    return input_nwb_path, processed_path, raw_path
 
+def parse_args() -> argparse.Namespace:
+    """
+    Parse command line arguments
+
+    Returns
+    -------
+    argparse.Namespace
+        The parsed arguments
+    """
     parser = argparse.ArgumentParser(description="Convert ophys dataset to NWB")
+
     parser.add_argument(
         "--input_directory",
         type=str,
         help="Path to the input directory",
-        default="/data/",
+        default="../data/",
     )
+
     parser.add_argument(
         "--output_directory",
         type=str,
         help="Path to the output file",
-        default="/results/",
+        default="../results/",
     )
-    parser.add_argument("--run_attached", action="store_true")
-    args = parser.parse_args()
+    return parser.parse_args()
 
+if __name__ == "__main__":
+    
+    args = parse_args()
     input_directory = Path(args.input_directory)
     output_directory = Path(args.output_directory)
 
-    input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
-    if len(input_nwb_paths) != 1:
-        raise AssertionError("enter only 1 nwb!")
-
-    input_nwb_path = input_nwb_paths[0]
-
-    processed_path = find_latest_processed_folder(args.input_directory)
-    raw_path = find_latest_raw_folder(args.input_directory)
-
+    input_nwb_paths, processed_path, raw_path = get_data_paths(input_directory)
     # There are only plane subfolders in the processed asset
     # So we can assume that each subfolder represents a plane
-    nb_planes = len([item for item in Path(processed_path).iterdir() if item.is_dir()])
-
-    # Planes are paired, so we only want to get half of them
-    nb_planes_per_group = 2
-    nb_group_planes = nb_planes / nb_planes_per_group
-    nb_group_planes = int(nb_group_planes)
+    
 
     processed_plane_paths = file_handling.plane_paths_from_session(
         processed_path, data_level="processed"
@@ -618,7 +645,12 @@ if __name__ == "__main__":
         keys=["vsync_2p", "2p_vsync"],
         units="seconds",
     )
+    nb_planes = len([item for item in Path(processed_path).iterdir() if item.is_dir() and "VI" in item.name])
 
+    # Planes are paired, so we only want to get half of them
+    nb_planes_per_group = 2
+    nb_group_planes = nb_planes / nb_planes_per_group
+    nb_group_planes = int(nb_group_planes)
     for plane_group in range(nb_group_planes):
         for indiv_plane_in_group in range(nb_planes_per_group):
             index_plane = plane_group * nb_planes_per_group + indiv_plane_in_group
