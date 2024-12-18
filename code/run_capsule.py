@@ -238,7 +238,6 @@ def nwb_ophys(
 
     overall_metadata = {}
     # Start plane specific processing
-    processed_targets = set()
     for plane_name, plane_files in file_paths["planes"].items():
         plane_path = Path(plane_files["processed_plane_path"])
         plane_name = plane_path.name
@@ -609,11 +608,6 @@ if __name__ == "__main__":
         subject_json_data = json.load(file)
 
     all_planes_session = session_json_data["data_streams"][0]["ophys_fovs"]
-
-    platform_json_path = list(Path(raw_path).glob(r"pophys/*_platform.json"))[0]
-
-    with open(platform_json_path, "r") as file:
-        platform_json_data = json.load(file)
 
     print(sync_path)
     # We get all timestamps
