@@ -115,7 +115,6 @@ def nwb_ophys(
     rig_json_data: dict,
     session_json_data: dict,
     subject_json_data: dict,
-    processing_json_data: dict,
 ) -> Tuple[pynwb.NWBFile, dict]:
     """Create an NWB file for ophys data
     
