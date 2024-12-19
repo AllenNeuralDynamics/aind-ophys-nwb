@@ -1,7 +1,11 @@
 import argparse
 import json
+import logging
 import shutil
+from collections import defaultdict
+from enum import Enum
 from pathlib import Path
+from typing import Tuple, Union
 
 # capsule
 import file_handling
@@ -10,29 +14,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pynwb
 import sparse
-import logging
-from typing import Tuple, Union
-from collections import defaultdict
-from enum import Enum
-
 from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
-from pynwb.image import Images, GrayscaleImage
-from pynwb.ophys import (
-    DfOverF,
-    Fluorescence,
-    ImageSegmentation,
-    OpticalChannel,
-    RoiResponseSeries,
-)
-
+from pynwb.image import GrayscaleImage, Images
+from pynwb.ophys import (DfOverF, Fluorescence, ImageSegmentation,
+                         OpticalChannel, RoiResponseSeries)
 from schemas import OphysMetadata
 
 
 class SegmentationApproach(Enum):
-    ANATOMICAL = {"approach": "cellpose", "description": "Cellpose with mean intensity projection"}
+    ANATOMICAL = {
+        "approach": "cellpose",
+        "description": "Cellpose with mean intensity projection",
+    }
     FUNCTIONAL = {"approach": "suite2p", "description": "Suite2p XXX"}
+
 
 def load_pynwb_extension(schema, path):
     neurodata_type = "OphysMetadataSchema"
@@ -460,7 +457,9 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
     raise FileNotFoundError("No matching raw folder found in the input directory.")
 
 
-def set_io_class_backend(input_nwb_path: Path, output_nwb: Path) -> Union[NWBHDF5IO, NWBZarrIO]:
+def set_io_class_backend(
+    input_nwb_path: Path, output_nwb: Path
+) -> Union[NWBHDF5IO, NWBZarrIO]:
     """Get the IO class based on the file extension
 
     Parameters
@@ -581,13 +580,19 @@ def get_metadata(raw_path: Path) -> Tuple[dict, dict, dict]:
     """
     rig_json_path = raw_path / "rig.json"
     if not rig_json_path.is_file():
-        raise FileNotFoundError(f"Rig JSON file not found in the raw folder, {rig_json_path}")
+        raise FileNotFoundError(
+            f"Rig JSON file not found in the raw folder, {rig_json_path}"
+        )
     session_json_path = raw_path / "session.json"
     if not session_json_path.is_file():
-        raise FileNotFoundError(f"Session JSON file not found in the raw folder, {session_json_path}")
+        raise FileNotFoundError(
+            f"Session JSON file not found in the raw folder, {session_json_path}"
+        )
     subject_json_path = raw_path / "subject.json"
     if not subject_json_path.is_file():
-        raise FileNotFoundError(f"Subject JSON file not found in the raw folder, {subject_json_path}")
+        raise FileNotFoundError(
+            f"Subject JSON file not found in the raw folder, {subject_json_path}"
+        )
 
     with open(rig_json_path) as f:
         rig_json_data = json.load(f)
