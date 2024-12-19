@@ -18,13 +18,8 @@ from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
 from pynwb.image import GrayscaleImage, Images
-from pynwb.ophys import (
-    DfOverF,
-    Fluorescence,
-    ImageSegmentation,
-    OpticalChannel,
-    RoiResponseSeries,
-)
+from pynwb.ophys import (DfOverF, Fluorescence, ImageSegmentation,
+                         OpticalChannel, RoiResponseSeries)
 from schemas import OphysMetadata
 
 
@@ -99,6 +94,7 @@ def load_generic_group(h5_file: Path, h5_group=None, h5_key=None) -> np.array:
     (np.array)
         Segmentation masks on full image
     """
+    print("h5", h5_file)
     with h5py.File(h5_file, "r") as f:
         masks = f[h5_group][h5_key][:]
 
@@ -126,13 +122,13 @@ def get_segementation_approach(extraction_h5: Path) -> SegmentationApproach:
     Returns
     -------
     SegmentationApproach
-        The segmentation approach, either CELLPOSE or ANATOMICAL
+        The segmentation approach, either SUITE2P_ANATOMICAL or SUITE2P_ACTIVITY
     """
     with h5py.File(extraction_h5, "r") as f:
         if f.get("cellpose", False):
-            return SegmentationApproach.ANATOMICAL
+            return SegmentationApproach.SUITE2P_ANATOMICAL
         else:
-            return SegmentationApproach.FUNCTIONAL
+            return SegmentationApproach.SUITE2P_ACTIVITY
 
 
 def get_microscope(
@@ -210,7 +206,9 @@ def nwb_ophys(
     dict
         The overall metadata
     """
-    device, optical_channel = get_microscope(nwbfile, rig_json_data, session_json_data)
+    device, optical_channel = get_microscope(
+        nwbfile, rig_json_data, session_json_data
+    )
     # Start plane specific processing
     for plane in ophys_fovs:
         plane_name = f"{plane['targeted_structure']}_{plane['index']}"
@@ -244,7 +242,7 @@ def nwb_ophys(
         segmentation_approach = get_segementation_approach(
             file_paths["planes"][plane_name]["extraction_h5"]
         )
-        plane_seg_approach = segmentation_approach.value["approach"]
+        plane_seg_approach = segmentation_approach.value["method"]
         plane_seg_descr = segmentation_approach.value["description"]
         img_seg = ImageSegmentation(name="image_segmentation")
         plane_segmentation = img_seg.create_plane_segmentation(
@@ -263,9 +261,7 @@ def nwb_ophys(
             resolution=float(plane["fov_scale_factor"]),
             description="Average intensity projection of entire session",
         )
-        max_projection = plt.imread(
-            file_paths["planes"][plane_name]["max_projection_png"]
-        )
+        max_projection = plt.imread(file_paths["planes"][plane_name]["max_projection_png"])
         max_img = GrayscaleImage(
             name="max_projection",
             data=max_projection,
@@ -273,9 +269,7 @@ def nwb_ophys(
             description="Max intensity projection of entire session",
         )
         segmetation_mask = load_generic_group(
-            file_paths["planes"][plane_name]["extraction_h5"],
-            h5_group="cellpose",
-            h5_key="masks",
+            file_paths["planes"][plane_name]["extraction_h5"], h5_group="cellpose", h5_key="masks"
         )
         mask_img = GrayscaleImage(
             name="segmentation_mask_image",
@@ -294,14 +288,10 @@ def nwb_ophys(
         # 4D. ROIS
 
         rois_shape = load_generic_group(
-            file_paths["planes"][plane_name]["extraction_h5"],
-            h5_group="rois",
-            h5_key="shape",
+            file_paths["planes"][plane_name]["extraction_h5"], h5_group="rois", h5_key="shape"
         )
 
-        for pixel_mask in load_sparse_array(
-            file_paths["planes"][plane_name]["extraction_h5"]
-        ):
+        for pixel_mask in load_sparse_array(file_paths["planes"][plane_name]["extraction_h5"]):
             plane_segmentation.add_roi(image_mask=pixel_mask)
 
         roi_traces, roi_names = load_signals(
@@ -417,6 +407,7 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
     """
     # Ensure input_directory is a Path object
     input_directory = Path(input_directory)
+    print(input_directory)
 
     # Search for folders that contain "multiplane-ophys" and "processed" in the name
     for folder in input_directory.glob("*"):
@@ -491,9 +482,11 @@ def set_io_class_backend(
         ).is_file(), f"{input_nwb_path.name} is not a valid Zarr folder"
         NWB_BACKEND = "zarr"
         io_class = NWBZarrIO
+        shutil.copytree(input_nwb_path, output_nwb, dirs_exist_ok=True)
     else:
         NWB_BACKEND = "hdf5"
         io_class = NWBHDF5IO
+        shutil.copy(input_nwb_fp, output_nwb_fp)
     logging.info(f"NWB backend: {NWB_BACKEND}")
     return io_class
 
@@ -696,9 +689,7 @@ if __name__ == "__main__":
     ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
     # determine if file is zarr or hdf5, and copy it to results
     output_nwb_fp = output_directory / input_nwb_fp.name
-
     io_class = set_io_class_backend(input_nwb_fp, output_nwb_fp)
-    shutil.copytree(input_nwb_fp, output_nwb_fp, dirs_exist_ok=True)
     name_space = "/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml"
     if not Path(name_space).is_file():
         raise FileNotFoundError(name_space)
@@ -710,7 +701,7 @@ if __name__ == "__main__":
         extensions=name_space,
     )
     nwb_file = io.read()
-    nwbfile = nwb_ophys(
+    nwbfile= nwb_ophys(
         nwb_file,
         file_paths,
         ophys_fovs,
@@ -721,12 +712,12 @@ if __name__ == "__main__":
     # Add plane metadata for each plane
     for fov in ophys_fovs:
         plane_metadata = OphysMetadata(
-            name=f'{fov["targeted_structure"]}_{fov["index"]}',
-            imaging_depth=str(fov["imaging_depth"]),
-            imaging_plane_group=str(fov["coupled_fov_index"]),
-            field_of_view_width=str(fov["fov_width"]),
-            field_of_view_height=str(fov["fov_height"]),
-        )
+            name = f'{fov["targeted_structure"]}_{fov["index"]}',
+            imaging_depth = str(fov["imaging_depth"]),
+            imaging_plane_group = str(fov["coupled_fov_index"]),
+            field_of_view_width = str(fov["fov_width"]),
+            field_of_view_height = str(fov["fov_height"])
+         )
 
         # Add the lab_metadata to the NWB file
         nwb_file.add_lab_meta_data(plane_metadata)
