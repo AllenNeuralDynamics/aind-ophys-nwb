@@ -568,26 +568,6 @@ def get_processed_file_paths(processed_path: Path) -> dict:
     return file_paths
 
 
-def load_json(fp: Path) -> dict:
-    """Loads json file from path
-
-    Parameters
-    ----------
-    fp: Path
-        Path to json file
-
-    Returns
-    -------
-    dict
-        Json file as dictionary
-    """
-    if not fp.is_file():
-        logging.error("File not found: %s", fp)
-        raise FileNotFoundError(f"File not found: {fp}")
-    with open(fp, "r") as f:
-        return json.load(f)
-
-
 def get_metadata(raw_path: Path) -> Tuple[dict, dict, dict]:
     """Get the metadata from the raw folder
     Parameters
@@ -601,18 +581,20 @@ def get_metadata(raw_path: Path) -> Tuple[dict, dict, dict]:
     """
     rig_json_path = raw_path / "rig.json"
     if not rig_json_path.is_file():
-        raise FileNotFoundError("Rig JSON file not found in the raw folder")
+        raise FileNotFoundError(f"Rig JSON file not found in the raw folder, {rig_json_path}")
     session_json_path = raw_path / "session.json"
     if not session_json_path.is_file():
-        raise FileNotFoundError("Session JSON file not found in the raw folder")
+        raise FileNotFoundError(f"Session JSON file not found in the raw folder, {session_json_path}")
     subject_json_path = raw_path / "subject.json"
     if not subject_json_path.is_file():
-        raise FileNotFoundError("Subject JSON file not found in the raw folder")
+        raise FileNotFoundError(f"Subject JSON file not found in the raw folder, {subject_json_path}")
 
-    rig_json_data = load_json(rig_json_path)
-    session_json_data = load_json(session_json_path)
-    subject_json_data = load_json(subject_json_path)
-
+    with open(rig_json_path) as f:
+        rig_json_data = json.load(f)
+    with open(session_json_path) as f:
+        session_json_data = json.load(f)
+    with open(subject_json_path) as f:
+        subject_json_data = json.load(f)
     return session_json_data, subject_json_data, rig_json_data
 
 
