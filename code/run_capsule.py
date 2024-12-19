@@ -31,8 +31,8 @@ from schemas import OphysMetadata
 
 
 class SegmentationApproach(Enum):
-    ANATOMICAL = "cellpose"
-    FUNCTIONAL = "suite2p"
+    ANATOMICAL = {"approach": "cellpose", "description": "Cellpose with mean intensity projection"}
+    FUNCTIONAL = {"approach": "suite2p", "description": "Suite2p XXX"}
 
 def load_pynwb_extension(schema, path):
     neurodata_type = "OphysMetadataSchema"
@@ -242,12 +242,8 @@ def nwb_ophys(
         segmentation_approach = get_segementation_approach(
             file_paths["planes"][plane_name]["extraction_h5"]
         )
-        if segmentation_approach:
-            plane_seg_approach = "cellpose-mean"
-            plane_seg_descr = "Cellpose with mean intensity projection"
-        else:
-            plane_seg_approach = "suite2p"
-            plane_seg_descr = "Suite2p XXX"
+        plane_seg_approach = segmentation_approach.value["approach"]
+        plane_seg_descr = segmentation_approach.value["description"]
         img_seg = ImageSegmentation(name="image_segmentation")
         plane_segmentation = img_seg.create_plane_segmentation(
             name="cell_specimen_table",
