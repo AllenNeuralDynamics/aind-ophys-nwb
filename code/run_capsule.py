@@ -13,6 +13,7 @@ import sparse
 import logging
 from typing import Tuple, Union
 from collections import defaultdict
+from enum import Enum
 
 from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
 from hdmf_zarr import NWBZarrIO
@@ -28,6 +29,10 @@ from pynwb.ophys import (
 
 from schemas import OphysMetadata
 
+
+class SegmentationApproach(Enum):
+    ANATOMICAL = "cellpose"
+    FUNCTIONAL = "suite2p"
 
 def load_pynwb_extension(schema, path):
     neurodata_type = "OphysMetadataSchema"
@@ -106,7 +111,7 @@ def load_sparse_array(h5_file):
     return pixelmasks
 
 
-def get_segementation_approach(extraction_h5: Path) -> bool:
+def get_segementation_approach(extraction_h5: Path) -> SegmentationApproach:
     """Get the segmentation approach from the extraction file
 
     Parameters
@@ -116,13 +121,14 @@ def get_segementation_approach(extraction_h5: Path) -> bool:
 
     Returns
     -------
-    bool
-        True if the segmentation approach is cellpose, False otherwise
+    SegmentationApproach
+        The segmentation approach, either CELLPOSE or ANATOMICAL
     """
     with h5py.File(extraction_h5, "r") as f:
         if f.get("cellpose", False):
-            return True
-    return False
+            return SegmentationApproach.CELLPOSE
+        else:
+            return SegmentationApproach.ANATOMICAL
 
 
 def get_microscope(
