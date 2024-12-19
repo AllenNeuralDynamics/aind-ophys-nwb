@@ -487,7 +487,7 @@ def set_io_class_backend(input_nwb_path: Path, output_nwb: Path) -> Union[NWBHDF
     return io_class
 
 
-def timestamps_to_fovs(ophys_fovs: list, sync_timestamps: np.array) -> list:
+def sync_times_to_multiplane_fovs(ophys_fovs: list, sync_timestamps: np.array) -> list:
     """Convert the timestamps to FOVs for multiplane only
 
     Parameters
@@ -693,7 +693,7 @@ if __name__ == "__main__":
     file_paths = get_processed_file_paths(processed_data_fp)
     sync_timestamps = get_sync_timestamps(raw_data_fp)
     ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]
-    ophys_fovs = timestamps_to_fovs(ophys_fovs, sync_timestamps)
+    ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
     # determine if file is zarr or hdf5, and copy it to results
     output_nwb_fp = output_directory / input_nwb_fp.name
 
