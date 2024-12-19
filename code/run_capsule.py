@@ -460,7 +460,7 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
     raise FileNotFoundError("No matching raw folder found in the input directory.")
 
 
-def get_io_class(input_nwb_path: Path, output_nwb: Path) -> Union[NWBHDF5IO, NWBZarrIO]:
+def set_io_class_backend(input_nwb_path: Path, output_nwb: Path) -> Union[NWBHDF5IO, NWBZarrIO]:
     """Get the IO class based on the file extension
 
     Parameters
@@ -480,11 +480,9 @@ def get_io_class(input_nwb_path: Path, output_nwb: Path) -> Union[NWBHDF5IO, NWB
         ).is_file(), f"{input_nwb_path.name} is not a valid Zarr folder"
         NWB_BACKEND = "zarr"
         io_class = NWBZarrIO
-        shutil.copytree(input_nwb_path, output_nwb, dirs_exist_ok=True)
     else:
         NWB_BACKEND = "hdf5"
         io_class = NWBHDF5IO
-        shutil.copyfile(input_nwb_path, output_nwb)
     logging.info(f"NWB backend: {NWB_BACKEND}")
     return io_class
 
@@ -699,7 +697,8 @@ if __name__ == "__main__":
     # determine if file is zarr or hdf5, and copy it to results
     output_nwb_fp = output_directory / input_nwb_fp.name
 
-    io_class = get_io_class(input_nwb_fp, output_nwb_fp)
+    io_class = set_io_class_backend(input_nwb_fp, output_nwb_fp)
+    shutil.copytree(input_nwb_fp, output_nwb_fp, dirs_exist_ok=True)
     name_space = "/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml"
     if Path(name_space).is_file():
         raise FileNotFoundError("ndx-aibs-behavior-ophys.namespace.yaml not found")
