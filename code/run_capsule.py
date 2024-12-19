@@ -483,9 +483,7 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
     if proc_asset and proc_asset.is_dir():
         return proc_asset
 
-    raise FileNotFoundError(
-        "No matching processed folder found in the input directory."
-    )
+    raise FileNotFoundError("No matching processed folder found in the input directory.")
 
 
 # Function to get the latest raw folder
@@ -554,7 +552,13 @@ if __name__ == "__main__":
 
     # There are only plane subfolders in the processed asset
     # So we can assume that each subfolder represents a plane
-    nb_planes = len([item for item in Path(processed_path).iterdir() if item.is_dir()])
+    nb_planes = len(
+        [
+            item
+            for item in Path(processed_path).iterdir()
+            if item.is_dir() and "VI" in item.name
+        ]
+    )
 
     # Planes are paired, so we only want to get half of them
     nb_planes_per_group = 2
