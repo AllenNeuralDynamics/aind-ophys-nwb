@@ -126,9 +126,9 @@ def get_segementation_approach(extraction_h5: Path) -> SegmentationApproach:
     """
     with h5py.File(extraction_h5, "r") as f:
         if f.get("cellpose", False):
-            return SegmentationApproach.CELLPOSE
-        else:
             return SegmentationApproach.ANATOMICAL
+        else:
+            return SegmentationApproach.FUNCTIONAL
 
 
 def get_microscope(
@@ -170,85 +170,6 @@ def get_microscope(
         emission_lambda=oc1_el,
     )
     return device, optical_channel
-
-
-def create_imaging_plane(
-    nwbfile: pynwb.NWBFile,
-    fov: dict,
-    location: set,
-    session_json_data: dict,
-    optical_channel: OpticalChannel,
-    device: pynwb.device,
-) -> pynwb.ophys.ImagingPlane:
-    """Create an imaging plane for the NWB file
-
-    Parameters
-    ----------
-    nwbfile : pynwb.NWBFile
-        The NWB file
-    fov : dict
-        The FOV metadata
-    location : set
-        The location of the imaging plane
-    session_json_data : dict
-        The session metadata
-    optical_channel : OpticalChannel
-        The optical channel
-    device : pynwb.device
-        NWB device
-
-    Returns
-    -------
-    pynwb.ophys.ImagingPlane
-        The imaging plane
-    """
-    return nwbfile.create_imaging_plane(
-        name=plane_name,  # ophys_plane_id
-        optical_channel=optical_channel,
-        imaging_rate=float(fov["frame_rate"]),
-        description="Two-photon imaging plane a",
-        device=device,
-        excitation_lambda=float(
-            session_json_data["data_streams"][0]["light_sources"][0]["wavelength"]
-        ),
-        indicator=subject_json_data["genotype"],
-        location=location,
-        grid_spacing=[
-            float(fov["fov_scale_factor"]),
-            float(fov["fov_scale_factor"]),
-        ],
-        grid_spacing_unit=fov["fov_coordinate_unit"],
-        origin_coords=[0.0, 0.0, 0.0],  # TODO: dunno
-        origin_coords_unit=fov["fov_coordinate_unit"],
-    )
-
-
-def create_plane_segmentation(
-    seg_approach: str, seg_descr: str, imaging_plane: pynwb.ophys.ImagingPlane
-) -> Tuple[pynwb.ophys.ImageSegmentation, pynwb.ophys.PlaneSegmentation]:
-    """Create a plane segmentation for the NWB file
-
-    Parameters
-    ----------
-    seg_approach : str
-        The segmentation approach
-    seg_descr : str
-        The segmentation description
-    imaging_plane : pynwb.ophys.ImagingPlane
-        The imaging plane
-
-    Returns
-    -------
-    Tuple[pynwb.ophys.ImageSegmentation, pynwb.ophys.PlaneSegmentation]
-        The image segmentation and plane segmentation
-    """
-    img_seg = ImageSegmentation(name="image_segmentation")
-    plane_segmentation = img_seg.create_plane_segmentation(
-        name="cell_specimen_table",
-        description=seg_approach + seg_descr,
-        imaging_plane=imaging_plane,
-    )
-    return img_seg, plane_segmentation
 
 
 def nwb_ophys(
@@ -299,8 +220,24 @@ def nwb_ophys(
             + str(plane["imaging_depth"])
         )
         ophys_module = nwbfile.create_processing_module(name=plane_name, description="")
-        imaging_plane = create_imaging_plane(
-            nwbfile, plane, location, session_json_data, optical_channel, device
+        imaging_plane = nwbfile.create_imaging_plane(
+            name=plane_name,  # ophys_plane_id
+            optical_channel=optical_channel,
+            imaging_rate=float(ophys_fovs["frame_rate"]),
+            description="Two-photon imaging plane a",
+            device=device,
+            excitation_lambda=float(
+                session_json_data["data_streams"][0]["light_sources"][0]["wavelength"]
+            ),
+            indicator=subject_json_data["genotype"],
+            location=location,
+            grid_spacing=[
+                float(ophys_fov["fov_scale_factor"]),
+                float(ophys_fov["fov_scale_factor"]),
+            ],
+            grid_spacing_unit=ophys_fov["fov_coordinate_unit"],
+            origin_coords=[0.0, 0.0, 0.0],  # TODO: dunno
+            origin_coords_unit=ophys_fov["fov_coordinate_unit"],
         )
         segmentation_approach = get_segementation_approach(
             file_paths["planes"][plane_name]["extraction_h5"]
@@ -311,9 +248,11 @@ def nwb_ophys(
         else:
             plane_seg_approach = "suite2p"
             plane_seg_descr = "Suite2p XXX"
-
-        img_seg, plane_segmentation = create_plane_segmentation(
-            plane_seg_approach, plane_seg_descr, imaging_plane
+        img_seg = ImageSegmentation(name="image_segmentation")
+        plane_segmentation = img_seg.create_plane_segmentation(
+            name="cell_specimen_table",
+            description=plane_seg_approach + plane_seg_descr,
+            imaging_plane=imaging_plane,
         )
         ophys_module.add(img_seg)
 
