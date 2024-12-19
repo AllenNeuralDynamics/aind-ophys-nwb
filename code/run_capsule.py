@@ -29,11 +29,14 @@ from schemas import OphysMetadata
 
 
 class SegmentationApproach(Enum):
-    ANATOMICAL = {
-        "approach": "cellpose",
-        "description": "Cellpose with mean intensity projection",
+    SUITE2P_ANATOMICAL = {
+        "method": "suite2p-cellpose",
+        "description": "Suite2p's anatomical mode using either the max or mean projection",
     }
-    FUNCTIONAL = {"approach": "suite2p", "description": "Suite2p XXX"}
+    SUITE2P_ACTIVITY = {
+        "method": "suite2p-functional",
+        "description": "Suite2p's activity-based ROI detection using 'sparse mode''",
+    }
 
 
 def load_pynwb_extension(schema, path):
