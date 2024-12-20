@@ -29,16 +29,19 @@ logger = logging.getLogger(__name__)
 #                            "extract_traces_json": "extract_traces.json",
 #                            "events_oasis_h5": "events_oasis.h5"}
 
-MULTIPLANE_FILE_PARTS = {"processing_json": "processing.json",
-                           "params_json": "_params.json",
-                           "registered_metrics_json": "_registered_metrics.json",
-                           "average_projection_png": "_average_projection.png",
-                           "max_projection_png": "_maximum_projection.png",
-                           "motion_transform_csv": "_motion_transform.csv",
-                           "extraction_h5": "extraction.h5",
-                           "dff_h5": "dff.h5",
-                           "extract_traces_json": "extract_traces.json",
-                           "events_oasis_h5": "events_oasis.h5"}
+MULTIPLANE_FILE_PARTS = {
+    "processing_json": "processing.json",
+    "params_json": "_params.json",
+    "registered_metrics_json": "_registered_metrics.json",
+    "average_projection_png": "_average_projection.png",
+    "max_projection_png": "_maximum_projection.png",
+    "motion_transform_csv": "_motion_transform.csv",
+    "extraction_h5": "extraction.h5",                           
+    "dff_h5": "dff.h5",
+    "extract_traces_json": "extract_traces.json",
+    "events_oasis_h5": "events_oasis.h5",
+    "classification_h5": "classification.h5"
+}
 
 
 def multiplane_session_data_files(input_path):

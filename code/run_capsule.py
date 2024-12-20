@@ -291,8 +291,24 @@ def nwb_ophys(
             file_paths["planes"][plane_name]["extraction_h5"], h5_group="rois", h5_key="shape"
         )
 
-        for pixel_mask in load_sparse_array(file_paths["planes"][plane_name]["extraction_h5"]):
-            plane_segmentation.add_roi(image_mask=pixel_mask)
+        classification_h5 = file_paths["planes"][plane_name]["classification_h5"]
+        if classification_h5:
+            dendrite_labels = load_generic_group(classification, h5_group="dendrites", h5_key="predictions")
+            soma_labels = load_generic_group(classification, h5_group="soma", h5_key="predictions")
+            border_labels = load_generic_group(classification, h5_group="border", h5_key="labels")
+            pixel_masks = load_sparse_array(file_paths["planes"][plane_name]["extraction_h5"])
+
+            for dl, sl, bl, pm in zip(dendrite_labels, soma_labels, border_labels, pixel_masks):
+                plane_segmentation.add_roi(
+                    image_mask=pm,
+                    is_dendrite=dl,
+                    is_soma=sl,
+                    is_border=bl
+                )
+        else:
+            logging.warning(f"no classification.h5 available for plane {plane_name}")
+            for pixel_mask in load_sparse_array(file_paths["planes"][plane_name]["extraction_h5"])::
+                plane_segmentation.add_roi(image_mask=pixel_mask)
 
         roi_traces, roi_names = load_signals(
             file_paths["planes"][plane_name]["extraction_h5"],
