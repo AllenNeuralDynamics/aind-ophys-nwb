@@ -261,6 +261,7 @@ def nwb_ophys(
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
         )
+        plane_segmentation.add_column(name="neuropil_mask", description="Neuropil masks for each ROI")
         ophys_module.add(img_seg)
 
         avg_projection = plt.imread(
