@@ -101,7 +101,7 @@ def load_generic_group(h5_file: Path, h5_group=None, h5_key=None) -> np.array:
     return masks
 
 
-def load_sparse_array(h5_file):
+def load_roi_masks(h5_file):
     with h5py.File(h5_file) as f:
         data = f["rois"]["data"][:]
         coords = f["rois"]["coords"][:]
@@ -109,6 +109,17 @@ def load_sparse_array(h5_file):
 
     pixelmasks = sparse.COO(coords, data, shape).todense()
     return pixelmasks
+
+
+def load_neuropil_masks(h5_file):
+    with h5py.File(h5_file) as f:
+        coords = f['rois/neuropil_coords'][:]
+        shape = f['rois/shape'][:]
+        
+    masks = np.zeros(shape)
+    masks[(coords[0], coords[1], coords[2])] = 1
+    
+    return masks
 
 
 def get_segementation_approach(extraction_h5: Path) -> SegmentationApproach:
@@ -250,6 +261,7 @@ def nwb_ophys(
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
         )
+        plane_segmentation.add_column(name="neuropil_mask", description="Neuropil masks for each ROI")
         ophys_module.add(img_seg)
 
         avg_projection = plt.imread(
@@ -291,8 +303,14 @@ def nwb_ophys(
             file_paths["planes"][plane_name]["extraction_h5"], h5_group="rois", h5_key="shape"
         )
 
-        for pixel_mask in load_sparse_array(file_paths["planes"][plane_name]["extraction_h5"]):
-            plane_segmentation.add_roi(image_mask=pixel_mask)
+        roi_masks = load_roi_masks(file_paths["planes"][plane_name]["extraction_h5"])
+        neuropil_masks = load_neuropil_masks(file_paths["planes"][plane_name]["extraction_h5"])
+
+        for rm, nm in zip(roi_masks, neuropil_masks):
+            plane_segmentation.add_roi(
+                image_mask=rm, 
+                neuropil_mask=nm
+            )
 
         roi_traces, roi_names = load_signals(
             file_paths["planes"][plane_name]["extraction_h5"],
