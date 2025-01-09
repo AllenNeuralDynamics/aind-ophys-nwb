@@ -701,7 +701,7 @@ if __name__ == "__main__":
         extensions=name_space,
     )
     nwb_file = io.read()
-    nwbfile= nwb_ophys(
+    nwb_file = nwb_ophys(
         nwb_file,
         file_paths,
         ophys_fovs,
