@@ -18,8 +18,13 @@ from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
 from pynwb.image import GrayscaleImage, Images
-from pynwb.ophys import (DfOverF, Fluorescence, ImageSegmentation,
-                         OpticalChannel, RoiResponseSeries)
+from pynwb.ophys import (
+    DfOverF,
+    Fluorescence,
+    ImageSegmentation,
+    OpticalChannel,
+    RoiResponseSeries,
+)
 from schemas import OphysMetadata
 
 
@@ -132,9 +137,7 @@ def get_segementation_approach(extraction_h5: Path) -> SegmentationApproach:
 
 
 def get_microscope(
-    nwbfile: pynwb.NWBFile,
-    rig_json_data: dict,
-    session_json_data: dict,
+    nwbfile: pynwb.NWBFile, rig_json_data: dict, session_json_data: dict,
 ) -> Tuple[pynwb.device.Device, OpticalChannel]:
     """Get microscope metadata for the NWB file
 
@@ -165,9 +168,7 @@ def get_microscope(
         manufacturer=microscope_manufacturer,
     )
     optical_channel = OpticalChannel(
-        name=oc1_name,
-        description=oc1_desc,
-        emission_lambda=oc1_el,
+        name=oc1_name, description=oc1_desc, emission_lambda=oc1_el,
     )
     return device, optical_channel
 
@@ -206,9 +207,7 @@ def nwb_ophys(
     dict
         The overall metadata
     """
-    device, optical_channel = get_microscope(
-        nwbfile, rig_json_data, session_json_data
-    )
+    device, optical_channel = get_microscope(nwbfile, rig_json_data, session_json_data)
     # Start plane specific processing
     for plane in ophys_fovs:
         plane_name = f"{plane['targeted_structure']}_{plane['index']}"
@@ -261,7 +260,9 @@ def nwb_ophys(
             resolution=float(plane["fov_scale_factor"]),
             description="Average intensity projection of entire session",
         )
-        max_projection = plt.imread(file_paths["planes"][plane_name]["max_projection_png"])
+        max_projection = plt.imread(
+            file_paths["planes"][plane_name]["max_projection_png"]
+        )
         max_img = GrayscaleImage(
             name="max_projection",
             data=max_projection,
@@ -269,7 +270,9 @@ def nwb_ophys(
             description="Max intensity projection of entire session",
         )
         segmetation_mask = load_generic_group(
-            file_paths["planes"][plane_name]["extraction_h5"], h5_group="cellpose", h5_key="masks"
+            file_paths["planes"][plane_name]["extraction_h5"],
+            h5_group="cellpose",
+            h5_key="masks",
         )
         mask_img = GrayscaleImage(
             name="segmentation_mask_image",
@@ -288,10 +291,14 @@ def nwb_ophys(
         # 4D. ROIS
 
         rois_shape = load_generic_group(
-            file_paths["planes"][plane_name]["extraction_h5"], h5_group="rois", h5_key="shape"
+            file_paths["planes"][plane_name]["extraction_h5"],
+            h5_group="rois",
+            h5_key="shape",
         )
 
-        for pixel_mask in load_sparse_array(file_paths["planes"][plane_name]["extraction_h5"]):
+        for pixel_mask in load_sparse_array(
+            file_paths["planes"][plane_name]["extraction_h5"]
+        ):
             plane_segmentation.add_roi(image_mask=pixel_mask)
 
         roi_traces, roi_names = load_signals(
@@ -349,7 +356,9 @@ def nwb_ophys(
         ), "Mismatch in number of ROIs and traces"
 
         dfof_traces, roi_names = load_signals(
-            file_paths["planes"][plane_name]["dff_h5"], plane_segmentation, h5_key="data"
+            file_paths["planes"][plane_name]["dff_h5"],
+            plane_segmentation,
+            h5_key="data",
         )
 
         dfof_traces_series = RoiResponseSeries(
@@ -423,7 +432,9 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
     if proc_asset and proc_asset.is_dir():
         return proc_asset
 
-    raise FileNotFoundError("No matching processed folder found in the input directory.")
+    raise FileNotFoundError(
+        "No matching processed folder found in the input directory."
+    )
 
 
 # Function to get the latest raw folder
@@ -538,7 +549,9 @@ def get_data_paths(input_directory: Path) -> Tuple[Path, Path, Path]:
     """
     input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
     if len(input_nwb_paths) != 1:
-        raise AssertionError("One valid NWB file must be present in the input directory")
+        raise AssertionError(
+            "One valid NWB file must be present in the input directory"
+        )
     input_nwb_path = input_nwb_paths[0]
     processed_path = find_latest_processed_folder(args.input_directory)
     raw_path = find_latest_raw_folder(args.input_directory)
@@ -564,9 +577,9 @@ def get_processed_file_paths(processed_path: Path, raw_path: Path) -> dict:
         processed_path, data_level="processed"
     )
     for plane_path in processed_plane_paths:
-        file_paths["planes"][plane_path.name] = (
-            file_handling.multiplane_session_data_files(plane_path)
-        )
+        file_paths["planes"][
+            plane_path.name
+        ] = file_handling.multiplane_session_data_files(plane_path)
         file_paths["planes"][plane_path.name]["processed_plane_path"] = plane_path
     file_paths["processed_path"] = processed_path
     file_paths["raw_path"] = raw_path
@@ -695,29 +708,21 @@ if __name__ == "__main__":
         raise FileNotFoundError(name_space)
     OphysMetadata = load_pynwb_extension("", name_space)
     io = io_class(
-        str(output_nwb_fp),
-        "r+",
-        load_namespaces=False,
-        extensions=name_space,
+        str(output_nwb_fp), "r+", load_namespaces=False, extensions=name_space,
     )
     nwb_file = io.read()
-    nwbfile= nwb_ophys(
-        nwb_file,
-        file_paths,
-        ophys_fovs,
-        rig_data,
-        session_data,
-        subject_data,
+    nwb_file = nwb_ophys(
+        nwb_file, file_paths, ophys_fovs, rig_data, session_data, subject_data,
     )
     # Add plane metadata for each plane
     for fov in ophys_fovs:
         plane_metadata = OphysMetadata(
-            name = f'{fov["targeted_structure"]}_{fov["index"]}',
-            imaging_depth = str(fov["imaging_depth"]),
-            imaging_plane_group = str(fov["coupled_fov_index"]),
-            field_of_view_width = str(fov["fov_width"]),
-            field_of_view_height = str(fov["fov_height"])
-         )
+            name=f'{fov["targeted_structure"]}_{fov["index"]}',
+            imaging_depth=str(fov["imaging_depth"]),
+            imaging_plane_group=str(fov["coupled_fov_index"]),
+            field_of_view_width=str(fov["fov_width"]),
+            field_of_view_height=str(fov["fov_height"]),
+        )
 
         # Add the lab_metadata to the NWB file
         nwb_file.add_lab_meta_data(plane_metadata)
