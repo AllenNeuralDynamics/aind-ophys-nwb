@@ -152,7 +152,7 @@ def plane_paths_from_session(session_path: Union[Path, str],
     data_level : str, optional
         Data level, by default "raw". Options: "raw", "processed"
     fovs: List, optional
-        List of ophys fovs
+        List of ophys fovs. Should be provided for all processed assets
 
     Returns
     -------
@@ -160,15 +160,17 @@ def plane_paths_from_session(session_path: Union[Path, str],
         List of plane paths
     """
     session_path = Path(session_path)
-    fov_pairs = []
-    for fov in fovs:
-        fov_plane = fov['targeted_structure']
-        fov_index = fov['index']
-        fov_pair= fov_plane +"_"+ str(fov_index)
-        fov_pairs.append(fov_pair)
-    if data_level == "processed":
-        planes = [x for x in fov_pairs]
-    elif data_level == "raw":
+    if fovs != [] and data_level == "processed":
+        fov_pairs = []
+        for fov in fovs:
+            fov_plane = fov['targeted_structure']
+            fov_index = fov['index']
+            fov_pair= fov_plane +"_"+ str(fov_index)
+            fov_pairs.append(fov_pair)
+            planes = [x for x in fov_pairs]
+    elif fovs == [] and data_level == "processed":
+        logger.error("Processed data requires ophys fovs")
+    if data_level == "raw":
         planes = [f for f in (session_path / 'pophys').glob(*) if f.is_dir()]
     return planes
 
