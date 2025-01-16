@@ -159,7 +159,8 @@ def plane_paths_from_session(session_path: Union[Path, str],
     list
         List of plane paths
     """
-    session_path = Path(session_path)
+    if isinstance(session_path, str):
+        session_path = Path(session_path)
     if fovs != [] and data_level == "processed":
         fov_pairs = []
         for fov in fovs:
