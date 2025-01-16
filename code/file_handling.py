@@ -151,6 +151,8 @@ def plane_paths_from_session(session_path: Union[Path, str],
         Path to the session directory
     data_level : str, optional
         Data level, by default "raw". Options: "raw", "processed"
+    fovs: List, optional
+        List of ophys fovs
 
     Returns
     -------
