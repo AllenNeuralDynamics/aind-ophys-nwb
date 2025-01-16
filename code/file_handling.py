@@ -162,13 +162,12 @@ def plane_paths_from_session(session_path: Union[Path, str],
     if isinstance(session_path, str):
         session_path = Path(session_path)
     if fovs != [] and data_level == "processed":
-        fov_pairs = []
+        planes = []
         for fov in fovs:
             fov_plane = fov['targeted_structure']
             fov_index = fov['index']
             fov_pair= fov_plane +"_"+ str(fov_index)
-            fov_pairs.append(fov_pair)
-            planes = [x for x in fov_pairs]
+            planes.append(fov_pair)
     elif fovs == [] and data_level == "processed":
         logger.error("Processed data requires ophys fovs")
     if data_level == "raw":
