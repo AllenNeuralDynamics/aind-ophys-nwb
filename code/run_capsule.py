@@ -574,11 +574,11 @@ def get_processed_file_paths(processed_path: Path, raw_path: Path, fovs: List) -
     """
     file_paths = defaultdict(dict)
     processed_plane_paths = file_handling.plane_paths_from_session(
-        processed_path, data_level="processed", fovs = fovs
+        processed_path, data_level="processed", fovs=fovs
     )
     for plane_path in processed_plane_paths:
-        file_paths["planes"][plane_path] = (
-            file_handling.multiplane_session_data_files(processed_path, plane_path)
+        file_paths["planes"][plane_path] = file_handling.multiplane_session_data_files(
+            processed_path, plane_path
         )
         file_paths["planes"][plane_path]["processed_plane_path"] = plane_path
     file_paths["processed_path"] = processed_path
@@ -697,7 +697,7 @@ if __name__ == "__main__":
     input_nwb_fp, processed_data_fp, raw_data_fp = get_data_paths(input_directory)
     session_data, subject_data, rig_data = get_metadata(raw_data_fp)
     ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]
-    file_paths = get_processed_file_paths(processed_data_fp, raw_data_fp,ophys_fovs)
+    file_paths = get_processed_file_paths(processed_data_fp, raw_data_fp, ophys_fovs)
     sync_timestamps = get_sync_timestamps(raw_data_fp)
     ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]
     ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
@@ -709,29 +709,21 @@ if __name__ == "__main__":
         raise FileNotFoundError(name_space)
     OphysMetadata = load_pynwb_extension("", name_space)
     io = io_class(
-        str(output_nwb_fp),
-        "r+",
-        load_namespaces=False,
-        extensions=name_space,
+        str(output_nwb_fp), "r+", load_namespaces=False, extensions=name_space,
     )
     nwb_file = io.read()
-    nwbfile= nwb_ophys(
-        nwb_file,
-        file_paths,
-        ophys_fovs,
-        rig_data,
-        session_data,
-        subject_data,
+    nwbfile = nwb_ophys(
+        nwb_file, file_paths, ophys_fovs, rig_data, session_data, subject_data,
     )
     # Add plane metadata for each plane
     for fov in ophys_fovs:
         plane_metadata = OphysMetadata(
-            name = f'{fov["targeted_structure"]}_{fov["index"]}',
-            imaging_depth = str(fov["imaging_depth"]),
-            imaging_plane_group = str(fov["coupled_fov_index"]),
-            field_of_view_width = str(fov["fov_width"]),
-            field_of_view_height = str(fov["fov_height"])
-         )
+            name=f'{fov["targeted_structure"]}_{fov["index"]}',
+            imaging_depth=str(fov["imaging_depth"]),
+            imaging_plane_group=str(fov["coupled_fov_index"]),
+            field_of_view_width=str(fov["fov_width"]),
+            field_of_view_height=str(fov["fov_height"]),
+        )
 
         # Add the lab_metadata to the NWB file
         nwb_file.add_lab_meta_data(plane_metadata)
