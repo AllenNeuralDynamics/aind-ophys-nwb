@@ -559,7 +559,7 @@ def get_data_paths(input_directory: Path) -> Tuple[Path, Path, Path]:
     return input_nwb_path, processed_path, raw_path
 
 
-def get_processed_file_paths(processed_path: Path, raw_path: Path) -> dict:
+def get_processed_file_paths(processed_path: Path, raw_path: Path, fovs: List) -> dict:
     """Get the paths to the processed files
     Parameters
     ----------
@@ -574,15 +574,16 @@ def get_processed_file_paths(processed_path: Path, raw_path: Path) -> dict:
     """
     file_paths = defaultdict(dict)
     processed_plane_paths = file_handling.plane_paths_from_session(
-        processed_path, data_level="processed"
+        processed_path, data_level="processed", fovs = fovs
     )
     for plane_path in processed_plane_paths:
-        file_paths["planes"][
-            plane_path.name
-        ] = file_handling.multiplane_session_data_files(plane_path)
-        file_paths["planes"][plane_path.name]["processed_plane_path"] = plane_path
+        file_paths["planes"][plane_path] = (
+            file_handling.multiplane_session_data_files(processed_path, plane_path)
+        )
+        file_paths["planes"][plane_path]["processed_plane_path"] = plane_path
     file_paths["processed_path"] = processed_path
     file_paths["raw_path"] = raw_path
+    print("GET PROC FILE", file_paths)
     return file_paths
 
 
