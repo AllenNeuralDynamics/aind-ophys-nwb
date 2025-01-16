@@ -30,24 +30,22 @@ logger = logging.getLogger(__name__)
 #                            "events_oasis_h5": "events_oasis.h5"}
 
 MULTIPLANE_FILE_PARTS = {"processing_json": "processing.json",
-                           "params_json": "_params.json",
-                           "registered_metrics_json": "_registered_metrics.json",
-                           "average_projection_png": "_average_projection.png",
-                           "max_projection_png": "_maximum_projection.png",
-                           "motion_transform_csv": "_motion_transform.csv",
+                           "params_json": "params.json",
+                           "registered_metrics_json": "registered_metrics.json",
+                           "average_projection_png": "average_projection.png",
+                           "max_projection_png": "maximum_projection.png",
+                           "motion_transform_csv": "motion_transform.csv",
                            "extraction_h5": "extraction.h5",
                            "dff_h5": "dff.h5",
                            "extract_traces_json": "extract_traces.json",
                            "events_oasis_h5": "events_oasis.h5"}
 
-
-def multiplane_session_data_files(input_path):
+def multiplane_session_data_files(input_path, plane):
     """Find all data files in a multiplane session directory."""
     input_path = Path(input_path)
     data_files = {}
     for key, value in MULTIPLANE_FILE_PARTS.items():
-        print(key, value)
-        data_files[key] = find_data_file(input_path, value)
+        data_files[key] = find_data_file(input_path, plane + "_" + value)
     return data_files
 
 
@@ -144,7 +142,7 @@ def get_sync_file_path(input_path, verbose=False):
 
 
 def plane_paths_from_session(session_path: Union[Path, str],
-                             data_level: str = "raw") -> list:
+                             data_level: str = "raw", fovs: List = []) -> list:
     """Get plane paths from a session directory
 
     Parameters
@@ -160,9 +158,15 @@ def plane_paths_from_session(session_path: Union[Path, str],
         List of plane paths
     """
     session_path = Path(session_path)
+    fov_pairs = []
+    for fov in fovs:
+        fov_plane = fov['targeted_structure']
+        fov_index = fov['index']
+        fov_pair= fov_plane +"_"+ str(fov_index)
+        
+        fov_pairs.append(fov_pair)
     if data_level == "processed":
-        planes = [x for x in session_path.iterdir() if x.is_dir()]
-        planes = [x for x in planes if 'nextflow' not in x.name]
+        planes = [x for x in fov_pairs]
     elif data_level == "raw":
         planes = list((session_path / 'ophys').glob('ophys_experiment_*'))
     return planes
