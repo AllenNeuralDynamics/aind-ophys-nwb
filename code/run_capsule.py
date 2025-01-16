@@ -689,17 +689,6 @@ def parse_args() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-    # Define the root directory (e.g., '/data')
-    root_directory = '/data'
-
-    # Generate the directory structure
-    directory_structure = get_directory_structure(root_directory)
-
-    # Save the structure to a JSON file
-    output_file = '/results/directory_structure.json'
-    with open(output_file, 'w') as json_file:
-        json.dump(directory_structure, json_file, indent=4)
-
     args = parse_args()
     input_directory = Path(args.input_directory)
     output_directory = Path(args.output_directory)
