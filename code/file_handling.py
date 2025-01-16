@@ -163,12 +163,11 @@ def plane_paths_from_session(session_path: Union[Path, str],
         fov_plane = fov['targeted_structure']
         fov_index = fov['index']
         fov_pair= fov_plane +"_"+ str(fov_index)
-        
         fov_pairs.append(fov_pair)
     if data_level == "processed":
         planes = [x for x in fov_pairs]
     elif data_level == "raw":
-        planes = list((session_path / 'ophys').glob('ophys_experiment_*'))
+        planes = [f for f in (session_path / 'pophys').glob(*) if f.is_dir()]
     return planes
 
 
