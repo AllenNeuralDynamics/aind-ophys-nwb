@@ -5,7 +5,7 @@ import shutil
 from collections import defaultdict
 from enum import Enum
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 
 # capsule
 import file_handling

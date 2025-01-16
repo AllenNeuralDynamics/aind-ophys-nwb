@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import json
-from typing import Union, Dict
+from typing import Union, Dict, List
 import warnings
 
 # set up logger
