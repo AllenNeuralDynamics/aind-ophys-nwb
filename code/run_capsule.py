@@ -1,7 +1,6 @@
 import argparse
 import json
 import logging
-import pytz
 from datetime import datetime
 import shutil
 from collections import defaultdict
@@ -709,8 +708,7 @@ if __name__ == "__main__":
     ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
 
     # Get the current date and time in Seattle timezone
-    seattle_tz = pytz.timezone("America/Los_Angeles")
-    current_time = datetime.now(seattle_tz)
+    current_time = datetime.now()
     formatted_date = current_time.strftime("%Y-%m-%d")
     formatted_time = current_time.strftime("%H-%M-%S")
     # determine if file is zarr or hdf5, and copy it to results
