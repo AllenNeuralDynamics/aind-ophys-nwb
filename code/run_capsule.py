@@ -707,7 +707,6 @@ if __name__ == "__main__":
     ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]
     ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
 
-    # Get the current date and time in Seattle timezone
     current_time = datetime.now()
     formatted_date = current_time.strftime("%Y-%m-%d")
     formatted_time = current_time.strftime("%H-%M-%S")
