@@ -391,9 +391,9 @@ def nwb_ophys(
             rois_shape[0]
         ), "Mismatch in number of ROIs and traces"
 
-        ophys_module.add(DfOverF(roi_response_series=dfof_traces_series, name="dff"))
+        ophys_module.add(DfOverF(roi_response_series=dfof_traces_series, name="dff_timeseries"))
 
-        ophys_module.add(Fluorescence(roi_response_series=roi_traces_series))
+        ophys_module.add(Fluorescence(roi_response_series=roi_traces_series,name="raw_timeseries"))
         ophys_module.add(neuropil_traces_series)
         ophys_module.add(neuropil_corrected_series)
         ophys_module.add(event_traces_series)
