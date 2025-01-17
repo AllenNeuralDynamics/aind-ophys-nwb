@@ -711,8 +711,8 @@ if __name__ == "__main__":
     # Get the current date and time in Seattle timezone
     seattle_tz = pytz.timezone("America/Los_Angeles")
     current_time = datetime.now(seattle_tz)
-    formatted_date = current_time.strftime("%Y_%m_%d")
-    formatted_time = current_time.strftime("%H_%M_%S")
+    formatted_date = current_time.strftime("%Y-%m-%d")
+    formatted_time = current_time.strftime("%H-%M-%S")
     # determine if file is zarr or hdf5, and copy it to results
     output_nwb_fp = (
         output_directory
