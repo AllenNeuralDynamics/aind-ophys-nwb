@@ -5,7 +5,7 @@ import shutil
 from collections import defaultdict
 from enum import Enum
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 
 # capsule
 import file_handling
@@ -559,7 +559,7 @@ def get_data_paths(input_directory: Path) -> Tuple[Path, Path, Path]:
     return input_nwb_path, processed_path, raw_path
 
 
-def get_processed_file_paths(processed_path: Path, raw_path: Path) -> dict:
+def get_processed_file_paths(processed_path: Path, raw_path: Path, fovs: List) -> dict:
     """Get the paths to the processed files
     Parameters
     ----------
@@ -574,15 +574,16 @@ def get_processed_file_paths(processed_path: Path, raw_path: Path) -> dict:
     """
     file_paths = defaultdict(dict)
     processed_plane_paths = file_handling.plane_paths_from_session(
-        processed_path, data_level="processed"
+        processed_path, data_level="processed", fovs=fovs
     )
     for plane_path in processed_plane_paths:
-        file_paths["planes"][
-            plane_path.name
-        ] = file_handling.multiplane_session_data_files(plane_path)
-        file_paths["planes"][plane_path.name]["processed_plane_path"] = plane_path
+        file_paths["planes"][plane_path] = file_handling.multiplane_session_data_files(
+            processed_path, plane_path
+        )
+        file_paths["planes"][plane_path]["processed_plane_path"] = plane_path
     file_paths["processed_path"] = processed_path
     file_paths["raw_path"] = raw_path
+    print("GET PROC FILE", file_paths)
     return file_paths
 
 
@@ -689,14 +690,14 @@ def parse_args() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-
     args = parse_args()
     input_directory = Path(args.input_directory)
     output_directory = Path(args.output_directory)
 
     input_nwb_fp, processed_data_fp, raw_data_fp = get_data_paths(input_directory)
     session_data, subject_data, rig_data = get_metadata(raw_data_fp)
-    file_paths = get_processed_file_paths(processed_data_fp, raw_data_fp)
+    ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]
+    file_paths = get_processed_file_paths(processed_data_fp, raw_data_fp, ophys_fovs)
     sync_timestamps = get_sync_timestamps(raw_data_fp)
     ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]
     ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
@@ -711,7 +712,7 @@ if __name__ == "__main__":
         str(output_nwb_fp), "r+", load_namespaces=False, extensions=name_space,
     )
     nwb_file = io.read()
-    nwb_file = nwb_ophys(
+    nwbfile = nwb_ophys(
         nwb_file, file_paths, ophys_fovs, rig_data, session_data, subject_data,
     )
     # Add plane metadata for each plane
