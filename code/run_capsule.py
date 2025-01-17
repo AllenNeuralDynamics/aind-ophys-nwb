@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+from datetime import datetime
 import shutil
 from collections import defaultdict
 from enum import Enum
@@ -391,9 +392,13 @@ def nwb_ophys(
             rois_shape[0]
         ), "Mismatch in number of ROIs and traces"
 
-        ophys_module.add(DfOverF(roi_response_series=dfof_traces_series, name="dff"))
+        ophys_module.add(
+            DfOverF(roi_response_series=dfof_traces_series, name="dff_timeseries")
+        )
 
-        ophys_module.add(Fluorescence(roi_response_series=roi_traces_series))
+        ophys_module.add(
+            Fluorescence(roi_response_series=roi_traces_series, name="raw_timeseries")
+        )
         ophys_module.add(neuropil_traces_series)
         ophys_module.add(neuropil_corrected_series)
         ophys_module.add(event_traces_series)
@@ -701,8 +706,15 @@ if __name__ == "__main__":
     sync_timestamps = get_sync_timestamps(raw_data_fp)
     ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]
     ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
+
+    current_time = datetime.now()
+    formatted_date = current_time.strftime("%Y-%m-%d")
+    formatted_time = current_time.strftime("%H-%M-%S")
     # determine if file is zarr or hdf5, and copy it to results
-    output_nwb_fp = output_directory / input_nwb_fp.name
+    output_nwb_fp = (
+        output_directory
+        / f"{input_nwb_fp.stem}_processed_{formatted_date}_{formatted_time}.nwb"
+    )
     io_class = set_io_class_backend(input_nwb_fp, output_nwb_fp)
     name_space = "/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml"
     if not Path(name_space).is_file():
