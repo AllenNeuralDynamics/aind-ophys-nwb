@@ -701,8 +701,14 @@ if __name__ == "__main__":
     sync_timestamps = get_sync_timestamps(raw_data_fp)
     ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]
     ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
+
+    # Get the current date and time in Seattle timezone
+    seattle_tz = pytz.timezone("America/Los_Angeles")
+    current_time = datetime.now(seattle_tz)
+    formatted_date = current_time.strftime("%Y_%m_%d")
+    formatted_time = current_time.strftime("%H_%M_%S")
     # determine if file is zarr or hdf5, and copy it to results
-    output_nwb_fp = output_directory / input_nwb_fp.name
+    output_nwb_fp = output_directory / f"{input_nwb_fp.stem}_processed_{formatted_date}_{formatted_time}.nwb"
     io_class = set_io_class_backend(input_nwb_fp, output_nwb_fp)
     name_space = "/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml"
     if not Path(name_space).is_file():
