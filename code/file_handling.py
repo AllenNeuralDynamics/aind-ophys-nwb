@@ -45,7 +45,20 @@ MULTIPLANE_FILE_PARTS = {
 
 
 def multiplane_session_data_files(input_path, plane):
-    """Find all data files in a multiplane session directory."""
+    """Find all data files in a multiplane session directory.
+    
+    Parameters
+    ----------
+    input_path : str or Path
+        The path to the directory to search.
+    plane : str
+        The plane name.
+    
+    Returns
+    -------
+    dict
+        A dictionary containing the file paths for each data file.
+    """
     input_path = Path(input_path)
     data_files = {}
     for key, value in MULTIPLANE_FILE_PARTS.items():
