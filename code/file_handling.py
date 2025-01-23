@@ -40,6 +40,7 @@ MULTIPLANE_FILE_PARTS = {
     "dff_h5": "dff.h5",
     "extract_traces_json": "extract_traces.json",
     "events_oasis_h5": "events_oasis.h5",
+    "classifier_h5": "classifier.h5",
 }
 
 
