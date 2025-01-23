@@ -98,13 +98,11 @@ def load_generic_group(h5_file: Path, h5_group=None, h5_key=None) -> np.array:
     Returns
     -------
     (np.array)
-        Segmentation masks on full image
+        data array
     """
     print("h5", h5_file)
     with h5py.File(h5_file, "r") as f:
-        masks = f[h5_group][h5_key][:]
-
-    return masks
+        return f[h5_group][h5_key][:]
 
 
 def load_sparse_array(h5_file):
