@@ -296,11 +296,7 @@ def nwb_ophys(
                 h5_key="masks",
             )
         else:
-            segmetation_mask = load_generic_group(
-                file_paths["planes"][plane_name]["extraction_h5"],
-                h5_group="XXX",  # TODO maybe something with stats.npy file?
-                h5_key="anatomical",
-            )
+            raise NotImplementedError("Cannot process functional segmentation")
         mask_img = GrayscaleImage(
             name="segmentation_mask_image",
             data=segmetation_mask,
