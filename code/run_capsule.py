@@ -96,8 +96,12 @@ def load_generic_group(h5_file: Path, h5_group=None, h5_key=None) -> np.array:
         data array
     """
     print("h5", h5_file)
-    with h5py.File(h5_file, "r") as f:
-        return f[h5_group][h5_key][:]
+    if h5_group:
+        with h5py.File(h5_file, "r") as f:
+            return f[h5_group][h5_key][:]
+    else:
+        with h5py.File(h5_file, "r") as f:
+            return f[h5_key][:]
 
 
 def load_sparse_array(h5_file):
