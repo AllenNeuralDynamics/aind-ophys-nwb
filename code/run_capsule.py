@@ -255,10 +255,20 @@ def nwb_ophys(
         plane_seg_approach = segmentation_approach.value["method"]
         plane_seg_descr = segmentation_approach.value["description"]
         img_seg = ImageSegmentation(name="image_segmentation")
+        predictions = load_generic_group(
+            file_paths["planes"][plane_name]["classifier_h5"],
+            h5_key='predictions',
+        )
+        probabilities = load_generic_group(
+            file_paths["planes"][plane_name]["classifier_h5"],
+            h5_key='probabilities',
+        )
         plane_segmentation = img_seg.create_plane_segmentation(
             name="cell_specimen_table",
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
+            columns=[predictions.tolist(),probabilities.tolist()],
+            column_names=["is_soma","probability"]
         )
         ophys_module.add(img_seg)
 
