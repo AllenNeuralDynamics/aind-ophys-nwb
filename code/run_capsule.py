@@ -1,12 +1,12 @@
 import argparse
 import json
 import logging
-from datetime import datetime
 import shutil
 from collections import defaultdict
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Tuple, Union, List
+from typing import List, Tuple, Union
 
 # capsule
 import file_handling
@@ -19,13 +19,8 @@ from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
 from pynwb.image import GrayscaleImage, Images
-from pynwb.ophys import (
-    DfOverF,
-    Fluorescence,
-    ImageSegmentation,
-    OpticalChannel,
-    RoiResponseSeries,
-)
+from pynwb.ophys import (DfOverF, Fluorescence, ImageSegmentation,
+                         OpticalChannel, RoiResponseSeries)
 from schemas import OphysMetadata
 
 
@@ -112,7 +107,7 @@ def load_sparse_array(h5_file):
     ----------
     h5_file : Path
         The path to the h5 file
-    
+
     Returns
     -------
     np.array
@@ -148,7 +143,9 @@ def get_segementation_approach(extraction_h5: Path) -> SegmentationApproach:
 
 
 def get_microscope(
-    nwbfile: pynwb.NWBFile, rig_json_data: dict, session_json_data: dict,
+    nwbfile: pynwb.NWBFile,
+    rig_json_data: dict,
+    session_json_data: dict,
 ) -> Tuple[pynwb.device.Device, OpticalChannel]:
     """Get microscope metadata for the NWB file
 
@@ -179,7 +176,9 @@ def get_microscope(
         manufacturer=microscope_manufacturer,
     )
     optical_channel = OpticalChannel(
-        name=oc1_name, description=oc1_desc, emission_lambda=oc1_el,
+        name=oc1_name,
+        description=oc1_desc,
+        emission_lambda=oc1_el,
     )
     return device, optical_channel
 
@@ -257,18 +256,18 @@ def nwb_ophys(
         img_seg = ImageSegmentation(name="image_segmentation")
         predictions = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
-            h5_key='predictions',
+            h5_key="predictions",
         )
         probabilities = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
-            h5_key='probabilities',
+            h5_key="probabilities",
         )
         plane_segmentation = img_seg.create_plane_segmentation(
             name="cell_specimen_table",
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
-            columns=[predictions.tolist(),probabilities.tolist()],
-            column_names=["is_soma","probability"]
+            columns=[predictions.tolist(), probabilities.tolist()],
+            column_names=["is_soma", "probability"],
         )
         ophys_module.add(img_seg)
 
@@ -299,7 +298,7 @@ def nwb_ophys(
         else:
             segmetation_mask = load_generic_group(
                 file_paths["planes"][plane_name]["extraction_h5"],
-                h5_group="XXX", #TODO maybe something with stats.npy file?
+                h5_group="XXX",  # TODO maybe something with stats.npy file?
                 h5_key="anatomical",
             )
         mask_img = GrayscaleImage(
@@ -464,9 +463,7 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
     if proc_asset and proc_asset.is_dir():
         return proc_asset
 
-    raise FileNotFoundError(
-        "No matching processed folder found in the input directory."
-    )
+    raise FileNotFoundError("No matching processed folder found in the input directory.")
 
 
 # Function to get the latest raw folder
@@ -581,9 +578,7 @@ def get_data_paths(input_directory: Path) -> Tuple[Path, Path, Path]:
     """
     input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
     if len(input_nwb_paths) != 1:
-        raise AssertionError(
-            "One valid NWB file must be present in the input directory"
-        )
+        raise AssertionError("One valid NWB file must be present in the input directory")
     input_nwb_path = input_nwb_paths[0]
     processed_path = find_latest_processed_folder(args.input_directory)
     raw_path = find_latest_raw_folder(args.input_directory)
@@ -748,11 +743,19 @@ if __name__ == "__main__":
         raise FileNotFoundError(name_space)
     OphysMetadata = load_pynwb_extension("", name_space)
     io = io_class(
-        str(output_nwb_fp), "r+", load_namespaces=False, extensions=name_space,
+        str(output_nwb_fp),
+        "r+",
+        load_namespaces=False,
+        extensions=name_space,
     )
     nwb_file = io.read()
     nwbfile = nwb_ophys(
-        nwb_file, file_paths, ophys_fovs, rig_data, session_data, subject_data,
+        nwb_file,
+        file_paths,
+        ophys_fovs,
+        rig_data,
+        session_data,
+        subject_data,
     )
     # Add plane metadata for each plane
     for fov in ophys_fovs:
