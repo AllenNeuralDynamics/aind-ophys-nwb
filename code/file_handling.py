@@ -1,12 +1,11 @@
 ## copied from comb
 
-from pathlib import Path
 import json
-from typing import Union, Dict, List
-import warnings
-
 # set up logger
 import logging
+import warnings
+from pathlib import Path
+from typing import Dict, List, Union
 
 logger = logging.getLogger(__name__)
 
@@ -46,14 +45,14 @@ MULTIPLANE_FILE_PARTS = {
 
 def multiplane_session_data_files(input_path, plane):
     """Find all data files in a multiplane session directory.
-    
+
     Parameters
     ----------
     input_path : str or Path
         The path to the directory to search.
     plane : str
         The plane name.
-    
+
     Returns
     -------
     dict
@@ -133,9 +132,7 @@ def get_sync_file_path(input_path, verbose=False):
     try:
         # method 1: find sync_file by name
         file_parts = {"sync_h5": "_sync.h5"}
-        sync_file_path = find_data_file(
-            input_path, file_parts["sync_h5"], verbose=False
-        )
+        sync_file_path = find_data_file(input_path, file_parts["sync_h5"], verbose=False)
     except IndexError as e:
         if verbose:
             logger.info("file with '*_sync.h5' not found, trying platform json")
@@ -333,9 +330,7 @@ def gcamp_from_genotype(genotype: str):
     """
 
     genotype_parts = genotype.split("-")
-    gcamp_part = next(
-        (part for part in genotype_parts if "gcamp" in part.lower()), None
-    )
+    gcamp_part = next((part for part in genotype_parts if "gcamp" in part.lower()), None)
 
     # Check for wildtype genotype
     if genotype.lower() in ["wt/wt", "wt/wt "]:
