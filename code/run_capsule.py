@@ -106,6 +106,18 @@ def load_generic_group(h5_file: Path, h5_group=None, h5_key=None) -> np.array:
 
 
 def load_sparse_array(h5_file):
+    """Obtain pixel masks from the h5 file
+
+    Parameters
+    ----------
+    h5_file : Path
+        The path to the h5 file
+    
+    Returns
+    -------
+    np.array
+        The pixel masks
+    """
     with h5py.File(h5_file) as f:
         data = f["rois"]["data"][:]
         coords = f["rois"]["coords"][:]
@@ -268,11 +280,18 @@ def nwb_ophys(
             resolution=float(plane["fov_scale_factor"]),  # pixels/cm
             description="Max intensity projection of entire session",
         )
-        segmetation_mask = load_generic_group(
-            file_paths["planes"][plane_name]["extraction_h5"],
-            h5_group="cellpose",
-            h5_key="masks",
-        )
+        if segmentation_approach == SegmentationApproach.SUITE2P_ACTIVITY:
+            segmetation_mask = load_generic_group(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                h5_group="cellpose",
+                h5_key="masks",
+            )
+        else:
+            segmetation_mask = load_generic_group(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                h5_group="XXX", #TODO maybe something with stats.npy file?
+                h5_key="anatomical",
+            )
         mask_img = GrayscaleImage(
             name="segmentation_mask_image",
             data=segmetation_mask,
