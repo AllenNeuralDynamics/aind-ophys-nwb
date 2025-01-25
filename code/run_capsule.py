@@ -360,12 +360,10 @@ def nwb_ophys(
             h5_group="rois",
             h5_key="shape",
         )
-
-        for pixel_mask, soma, soma_prob in (load_sparse_array(
+        for (idx, pixel_mask) in enumerate(load_sparse_array(
             file_paths["planes"][plane_name]["extraction_h5"]
-        ), soma_predictions, soma_probabilities):
-            import pdb;pdb.set_trace()
-            plane_segmentation.add_roi(image_mask=pixel_mask, is_soma=soma, soma_probability=soma_prob)
+        )):
+            plane_segmentation.add_roi(image_mask=pixel_mask, is_soma=soma_predictions[idx], soma_probability=soma_probabilities[idx])
 
         roi_traces, roi_names = load_signals(
             file_paths["planes"][plane_name]["extraction_h5"],
@@ -743,14 +741,14 @@ def parse_args() -> argparse.Namespace:
         "--input_directory",
         type=str,
         help="Path to the input directory",
-        default="data/",
+        default="/data/",
     )
 
     parser.add_argument(
         "--output_directory",
         type=str,
         help="Path to the output file",
-        default="results/",
+        default="/results/",
     )
     return parser.parse_args()
 
