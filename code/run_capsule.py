@@ -288,13 +288,15 @@ def nwb_ophys(
             name="cell_specimen_table",
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
-            columns=[
-                {"is_soma": soma_predictions.tolist(),
-                "soma_probabilities": soma_probabilities.tolist(),
-                "is_dendrite": dendrite_predictions.tolist(),
-                "dendrite_probabilities": dendrite_probabilities.tolist()},
-            ],
-             colnames=["is_soma", "soma_probablities", "is_dendrite", "probabilities"],
+            columns=[soma_predictions.tolist(), soma_probabilities.tolist()],
+            # columns=[
+            #     {"is_soma": soma_predictions.tolist(),
+            #     "soma_probabilities": soma_probabilities.tolist(),
+            #     "is_dendrite": dendrite_predictions.tolist(),
+            #     "dendrite_probabilities": dendrite_probabilities.tolist()},
+            # ],
+            colnames=["is_soma", "soma_probablities"],
+            #  colnames=["is_soma", "soma_probablities", "is_dendrite", "probabilities"],
         )
         ophys_module.add(img_seg)
 
