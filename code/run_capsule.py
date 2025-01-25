@@ -269,11 +269,11 @@ def nwb_ophys(
         )
         dendrite_predictions = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
-            h5_group="dendrite", h5_key="predictions",
+            h5_group="dendrites", h5_key="predictions",
         )
         dendrite_probabilities = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
-            h5_group="dendrite", h5_key="probabilities",
+            h5_group="dendrites", h5_key="probabilities",
         )
         plane_segmentation = img_seg.create_plane_segmentation(
             name="cell_specimen_table",
