@@ -316,7 +316,7 @@ def nwb_ophys(
             resolution=float(plane["fov_scale_factor"]),  # pixels/cm
             description="Max intensity projection of entire session",
         )
-        if segmentation_approach == SegmentationApproach.SUITE2P_ACTIVITY:
+        if segmentation_approach == SegmentationApproach.SUITE2P_ANATOMICAL:
             segmetation_mask = load_generic_group(
                 file_paths["planes"][plane_name]["extraction_h5"],
                 h5_group="cellpose",
