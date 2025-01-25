@@ -292,12 +292,12 @@ def nwb_ophys(
             columns=[
                 VectorData(
                     name="is_soma",
-                    data=soma_predictions.tolist(),
+                    #data=soma_predictions.tolist(),
                     description="Soma predictions",
                 ),
                 VectorData(
-                    name="soma_probabilities",
-                    data=soma_probabilities.tolist(),
+                    name="soma_probability",
+                    #data=soma_probabilities.tolist(),
                     description="Soma probabilities",
                 ),
             ],
@@ -308,7 +308,7 @@ def nwb_ophys(
             #     "is_dendrite": dendrite_predictions.tolist(),
             #     "dendrite_probabilities": dendrite_probabilities.tolist()},
             # ],
-            colnames=["is_soma", "soma_probabilities"],
+            colnames=["is_soma", "soma_probability"],
             #  colnames=["is_soma", "soma_probablities", "is_dendrite", "probabilities"],
         )
         ophys_module.add(img_seg)
@@ -361,10 +361,11 @@ def nwb_ophys(
             h5_key="shape",
         )
 
-        for pixel_mask in load_sparse_array(
+        for pixel_mask, soma, soma_prob in (load_sparse_array(
             file_paths["planes"][plane_name]["extraction_h5"]
-        ):
-            plane_segmentation.add_roi(image_mask=pixel_mask)
+        ), soma_predictions, soma_probabilities):
+            import pdb;pdb.set_trace()
+            plane_segmentation.add_roi(image_mask=pixel_mask, is_soma=soma, soma_probability=soma_prob)
 
         roi_traces, roi_names = load_signals(
             file_paths["planes"][plane_name]["extraction_h5"],
@@ -742,14 +743,14 @@ def parse_args() -> argparse.Namespace:
         "--input_directory",
         type=str,
         help="Path to the input directory",
-        default="../data/",
+        default="data/",
     )
 
     parser.add_argument(
         "--output_directory",
         type=str,
         help="Path to the output file",
-        default="../results/",
+        default="results/",
     )
     return parser.parse_args()
 
