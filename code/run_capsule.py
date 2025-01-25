@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import List, Tuple, Union
-from hdmf import VectorData
+from hdmf.common import VectorData
 
 # capsule
 import file_handling
@@ -300,7 +300,7 @@ def nwb_ophys(
                     data=soma_probabilities.tolist(),
                     description="Soma probabilities",
                 ),
-            ]
+            ],
             # columns=[soma_predictions.tolist(), soma_probabilities.tolist()],
             # columns=[
             #     {"is_soma": soma_predictions.tolist(),
@@ -308,7 +308,7 @@ def nwb_ophys(
             #     "is_dendrite": dendrite_predictions.tolist(),
             #     "dendrite_probabilities": dendrite_probabilities.tolist()},
             # ],
-            #colnames=["is_soma", "soma_probablities"],
+            colnames=["is_soma", "soma_probabilities"],
             #  colnames=["is_soma", "soma_probablities", "is_dendrite", "probabilities"],
         )
         ophys_module.add(img_seg)
