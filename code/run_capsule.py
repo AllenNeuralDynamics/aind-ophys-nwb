@@ -19,8 +19,13 @@ from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
 from pynwb.image import GrayscaleImage, Images
-from pynwb.ophys import (DfOverF, Fluorescence, ImageSegmentation,
-                         OpticalChannel, RoiResponseSeries)
+from pynwb.ophys import (
+    DfOverF,
+    Fluorescence,
+    ImageSegmentation,
+    OpticalChannel,
+    RoiResponseSeries,
+)
 from schemas import OphysMetadata
 
 
@@ -261,26 +266,35 @@ def nwb_ophys(
         img_seg = ImageSegmentation(name="image_segmentation")
         soma_predictions = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
-            h5_group="soma", h5_key="predictions",
+            h5_group="soma",
+            h5_key="predictions",
         )
         soma_probabilities = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
-            h5_group="soma", h5_key="probabilities",
+            h5_group="soma",
+            h5_key="probabilities",
         )
         dendrite_predictions = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
-            h5_group="dendrites", h5_key="predictions",
+            h5_group="dendrites",
+            h5_key="predictions",
         )
         dendrite_probabilities = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
-            h5_group="dendrites", h5_key="probabilities",
+            h5_group="dendrites",
+            h5_key="probabilities",
         )
         plane_segmentation = img_seg.create_plane_segmentation(
             name="cell_specimen_table",
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
-            columns=[{"is_soma": soma_predictions.tolist()}, {"soma_probabilities":soma_probabilities.tolist()}, {"is_dendrite": dendrite_predictions.tolist()},{"dendrite_probabilities": dendrite_probabilities.tolist()]},
-            #colnames=["is_soma", "soma_probablities", "is_dendrite", "probabilities"],
+            columns=[
+                {"is_soma": soma_predictions.tolist()},
+                {"soma_probabilities": soma_probabilities.tolist()},
+                {"is_dendrite": dendrite_predictions.tolist()},
+                {"dendrite_probabilities": dendrite_probabilities.tolist()},
+            ],
+            # colnames=["is_soma", "soma_probablities", "is_dendrite", "probabilities"],
         )
         ophys_module.add(img_seg)
 
