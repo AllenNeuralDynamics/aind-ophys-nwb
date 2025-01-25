@@ -7,7 +7,6 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import List, Tuple, Union
-from hdmf.common import VectorData
 
 # capsule
 import file_handling
@@ -17,16 +16,12 @@ import numpy as np
 import pynwb
 import sparse
 from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
+from hdmf.common import VectorData
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
 from pynwb.image import GrayscaleImage, Images
-from pynwb.ophys import (
-    DfOverF,
-    Fluorescence,
-    ImageSegmentation,
-    OpticalChannel,
-    RoiResponseSeries,
-)
+from pynwb.ophys import (DfOverF, Fluorescence, ImageSegmentation,
+                         OpticalChannel, RoiResponseSeries)
 from schemas import OphysMetadata
 
 
@@ -292,24 +287,27 @@ def nwb_ophys(
             columns=[
                 VectorData(
                     name="is_soma",
-                    #data=soma_predictions.tolist(),
                     description="Soma predictions",
                 ),
                 VectorData(
                     name="soma_probability",
-                    #data=soma_probabilities.tolist(),
                     description="Soma probabilities",
                 ),
+                VectorData(
+                    name="is_dendrite",
+                    description="Dendrite predictions",
+                ),
+                VectorData(
+                    name="dendrite_probability",
+                    description="Dendrite probabilities",
+                ),
             ],
-            # columns=[soma_predictions.tolist(), soma_probabilities.tolist()],
-            # columns=[
-            #     {"is_soma": soma_predictions.tolist(),
-            #     "soma_probabilities": soma_probabilities.tolist(),
-            #     "is_dendrite": dendrite_predictions.tolist(),
-            #     "dendrite_probabilities": dendrite_probabilities.tolist()},
-            # ],
-            colnames=["is_soma", "soma_probability"],
-            #  colnames=["is_soma", "soma_probablities", "is_dendrite", "probabilities"],
+            colnames=[
+                "is_soma",
+                "soma_probability",
+                "is_dendrite",
+                "dendrite_probability",
+            ],
         )
         ophys_module.add(img_seg)
 
@@ -360,10 +358,16 @@ def nwb_ophys(
             h5_group="rois",
             h5_key="shape",
         )
-        for (idx, pixel_mask) in enumerate(load_sparse_array(
-            file_paths["planes"][plane_name]["extraction_h5"]
-        )):
-            plane_segmentation.add_roi(image_mask=pixel_mask, is_soma=soma_predictions[idx], soma_probability=soma_probabilities[idx])
+        for idx, pixel_mask in enumerate(
+            load_sparse_array(file_paths["planes"][plane_name]["extraction_h5"])
+        ):
+            plane_segmentation.add_roi(
+                image_mask=pixel_mask,
+                is_soma=soma_predictions[idx],
+                soma_probability=soma_probabilities[idx],
+                is_dendrite=dendrite_predictions[idx],
+                dendrite_probability=dendrite_probabilities[idx],
+            )
 
         roi_traces, roi_names = load_signals(
             file_paths["planes"][plane_name]["extraction_h5"],
