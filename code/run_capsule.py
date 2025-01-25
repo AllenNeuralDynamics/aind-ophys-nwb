@@ -308,7 +308,7 @@ def nwb_ophys(
             #     "is_dendrite": dendrite_predictions.tolist(),
             #     "dendrite_probabilities": dendrite_probabilities.tolist()},
             # ],
-            colnames=["is_soma", "soma_probablities"],
+            #colnames=["is_soma", "soma_probablities"],
             #  colnames=["is_soma", "soma_probablities", "is_dendrite", "probabilities"],
         )
         ophys_module.add(img_seg)
