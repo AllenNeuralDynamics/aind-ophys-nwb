@@ -101,6 +101,7 @@ def load_generic_group(h5_file: Path, h5_group=None, h5_key=None) -> np.array:
             return f[h5_group][h5_key][:]
     else:
         with h5py.File(h5_file, "r") as f:
+            print(f[h5_key])
             return f[h5_key][:]
 
 
