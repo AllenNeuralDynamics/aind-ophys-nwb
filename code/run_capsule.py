@@ -280,7 +280,7 @@ def nwb_ophys(
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
             columns=[soma_predictions.tolist(), soma_probabilities.tolist(), dendrite_predictions.tolist(),dendrite_probabilities.tolist()],
-            column_names=["is_soma", "soma_probablities", "is_dendrite", "probabilities"],
+            colnames=["is_soma", "soma_probablities", "is_dendrite", "probabilities"],
         )
         ophys_module.add(img_seg)
 
