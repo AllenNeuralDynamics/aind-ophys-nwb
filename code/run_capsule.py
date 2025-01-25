@@ -289,7 +289,19 @@ def nwb_ophys(
             name="cell_specimen_table",
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
-            columns=[soma_predictions.tolist(), soma_probabilities.tolist()],
+            columns=[
+                VectorData(
+                    name="is_soma",
+                    data=soma_predictions.tolist(),
+                    description="Soma predictions",
+                ),
+                VectorData(
+                    name="soma_probabilities",
+                    data=soma_probabilities.tolist(),
+                    description="Soma probabilities",
+                ),
+            ]
+            # columns=[soma_predictions.tolist(), soma_probabilities.tolist()],
             # columns=[
             #     {"is_soma": soma_predictions.tolist(),
             #     "soma_probabilities": soma_probabilities.tolist(),
