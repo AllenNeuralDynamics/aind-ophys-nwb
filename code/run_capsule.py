@@ -281,7 +281,7 @@ def nwb_ophys(
             h5_key="probabilities",
         )
         plane_segmentation = img_seg.create_plane_segmentation(
-            name="cell_specimen_table",
+            name="roi_table",
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
             columns=[
