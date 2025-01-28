@@ -96,13 +96,11 @@ def load_generic_group(h5_file: Path, h5_group=None, h5_key=None) -> np.array:
     (np.array)
         data array
     """
-    print("h5", h5_file)
     if h5_group:
         with h5py.File(h5_file, "r") as f:
             return f[h5_group][h5_key][:]
     else:
         with h5py.File(h5_file, "r") as f:
-            print(f[h5_key])
             return f[h5_key][:]
 
 
@@ -651,7 +649,6 @@ def get_processed_file_paths(processed_path: Path, raw_path: Path, fovs: List) -
         file_paths["planes"][plane_path]["processed_plane_path"] = plane_path
     file_paths["processed_path"] = processed_path
     file_paths["raw_path"] = raw_path
-    print("GET PROC FILE", file_paths)
     return file_paths
 
 
