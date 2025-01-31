@@ -20,8 +20,13 @@ from hdmf.common import VectorData
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
 from pynwb.image import GrayscaleImage, Images
-from pynwb.ophys import (DfOverF, Fluorescence, ImageSegmentation,
-                         OpticalChannel, RoiResponseSeries)
+from pynwb.ophys import (
+    DfOverF,
+    Fluorescence,
+    ImageSegmentation,
+    OpticalChannel,
+    RoiResponseSeries,
+)
 from schemas import OphysMetadata
 
 
@@ -362,9 +367,13 @@ def nwb_ophys(
             plane_segmentation.add_roi(
                 image_mask=pixel_mask,
                 is_soma=soma_predictions[idx],
-                soma_probability=soma_probabilities[idx][-1],
+                soma_probability=soma_probabilities[idx][
+                    -1
+                ],  # last element is the probability
                 is_dendrite=dendrite_predictions[idx],
-                dendrite_probability=dendrite_probabilities[idx][-1],
+                dendrite_probability=dendrite_probabilities[idx][
+                    -1
+                ],  # last element is the probability
             )
 
         roi_traces, roi_names = load_signals(
