@@ -362,9 +362,9 @@ def nwb_ophys(
             plane_segmentation.add_roi(
                 image_mask=pixel_mask,
                 is_soma=soma_predictions[idx],
-                soma_probability=soma_probabilities[idx],
+                soma_probability=soma_probabilities[idx][-1],
                 is_dendrite=dendrite_predictions[idx],
-                dendrite_probability=dendrite_probabilities[idx],
+                dendrite_probability=dendrite_probabilities[idx][-1],
             )
 
         roi_traces, roi_names = load_signals(
