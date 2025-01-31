@@ -1,12 +1,12 @@
 import argparse
 import json
 import logging
-from datetime import datetime
 import shutil
 from collections import defaultdict
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Tuple, Union, List
+from typing import List, Tuple, Union
 
 # capsule
 import file_handling
@@ -16,6 +16,7 @@ import numpy as np
 import pynwb
 import sparse
 from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
+from hdmf.common import VectorData
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBHDF5IO
 from pynwb.image import GrayscaleImage, Images
@@ -98,16 +99,29 @@ def load_generic_group(h5_file: Path, h5_group=None, h5_key=None) -> np.array:
     Returns
     -------
     (np.array)
-        Segmentation masks on full image
+        data array
     """
-    print("h5", h5_file)
-    with h5py.File(h5_file, "r") as f:
-        masks = f[h5_group][h5_key][:]
-
-    return masks
+    if h5_group:
+        with h5py.File(h5_file, "r") as f:
+            return f[h5_group][h5_key][:]
+    else:
+        with h5py.File(h5_file, "r") as f:
+            return f[h5_key][:]
 
 
 def load_sparse_array(h5_file):
+    """Obtain pixel masks from the h5 file
+
+    Parameters
+    ----------
+    h5_file : Path
+        The path to the h5 file
+
+    Returns
+    -------
+    np.array
+        The pixel masks
+    """
     with h5py.File(h5_file) as f:
         data = f["rois"]["data"][:]
         coords = f["rois"]["coords"][:]
@@ -138,7 +152,9 @@ def get_segementation_approach(extraction_h5: Path) -> SegmentationApproach:
 
 
 def get_microscope(
-    nwbfile: pynwb.NWBFile, rig_json_data: dict, session_json_data: dict,
+    nwbfile: pynwb.NWBFile,
+    rig_json_data: dict,
+    session_json_data: dict,
 ) -> Tuple[pynwb.device.Device, OpticalChannel]:
     """Get microscope metadata for the NWB file
 
@@ -169,7 +185,9 @@ def get_microscope(
         manufacturer=microscope_manufacturer,
     )
     optical_channel = OpticalChannel(
-        name=oc1_name, description=oc1_desc, emission_lambda=oc1_el,
+        name=oc1_name,
+        description=oc1_desc,
+        emission_lambda=oc1_el,
     )
     return device, optical_channel
 
@@ -245,10 +263,54 @@ def nwb_ophys(
         plane_seg_approach = segmentation_approach.value["method"]
         plane_seg_descr = segmentation_approach.value["description"]
         img_seg = ImageSegmentation(name="image_segmentation")
+        soma_predictions = load_generic_group(
+            file_paths["planes"][plane_name]["classifier_h5"],
+            h5_group="soma",
+            h5_key="predictions",
+        )
+        soma_probabilities = load_generic_group(
+            file_paths["planes"][plane_name]["classifier_h5"],
+            h5_group="soma",
+            h5_key="probabilities",
+        )
+        dendrite_predictions = load_generic_group(
+            file_paths["planes"][plane_name]["classifier_h5"],
+            h5_group="dendrites",
+            h5_key="predictions",
+        )
+        dendrite_probabilities = load_generic_group(
+            file_paths["planes"][plane_name]["classifier_h5"],
+            h5_group="dendrites",
+            h5_key="probabilities",
+        )
         plane_segmentation = img_seg.create_plane_segmentation(
-            name="cell_specimen_table",
+            name="roi_table",
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
+            columns=[
+                VectorData(
+                    name="is_soma",
+                    description="Soma predictions",
+                ),
+                VectorData(
+                    name="soma_probability",
+                    description="Soma probabilities",
+                ),
+                VectorData(
+                    name="is_dendrite",
+                    description="Dendrite predictions",
+                ),
+                VectorData(
+                    name="dendrite_probability",
+                    description="Dendrite probabilities",
+                ),
+            ],
+            colnames=[
+                "is_soma",
+                "soma_probability",
+                "is_dendrite",
+                "dendrite_probability",
+            ],
         )
         ophys_module.add(img_seg)
 
@@ -270,11 +332,14 @@ def nwb_ophys(
             resolution=float(plane["fov_scale_factor"]),  # pixels/cm
             description="Max intensity projection of entire session",
         )
-        segmetation_mask = load_generic_group(
-            file_paths["planes"][plane_name]["extraction_h5"],
-            h5_group="cellpose",
-            h5_key="masks",
-        )
+        if segmentation_approach == SegmentationApproach.SUITE2P_ANATOMICAL:
+            segmetation_mask = load_generic_group(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                h5_group="cellpose",
+                h5_key="masks",
+            )
+        else:
+            raise NotImplementedError("Cannot process functional segmentation")
         mask_img = GrayscaleImage(
             name="segmentation_mask_image",
             data=segmetation_mask,
@@ -296,11 +361,20 @@ def nwb_ophys(
             h5_group="rois",
             h5_key="shape",
         )
-
-        for pixel_mask in load_sparse_array(
-            file_paths["planes"][plane_name]["extraction_h5"]
+        for idx, pixel_mask in enumerate(
+            load_sparse_array(file_paths["planes"][plane_name]["extraction_h5"])
         ):
-            plane_segmentation.add_roi(image_mask=pixel_mask)
+            plane_segmentation.add_roi(
+                image_mask=pixel_mask,
+                is_soma=soma_predictions[idx],
+                soma_probability=soma_probabilities[idx][
+                    -1
+                ],  # last element is the probability
+                is_dendrite=dendrite_predictions[idx],
+                dendrite_probability=dendrite_probabilities[idx][
+                    -1
+                ],  # last element is the probability
+            )
 
         roi_traces, roi_names = load_signals(
             file_paths["planes"][plane_name]["extraction_h5"],
@@ -437,9 +511,7 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
     if proc_asset and proc_asset.is_dir():
         return proc_asset
 
-    raise FileNotFoundError(
-        "No matching processed folder found in the input directory."
-    )
+    raise FileNotFoundError("No matching processed folder found in the input directory.")
 
 
 # Function to get the latest raw folder
@@ -554,9 +626,7 @@ def get_data_paths(input_directory: Path) -> Tuple[Path, Path, Path]:
     """
     input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
     if len(input_nwb_paths) != 1:
-        raise AssertionError(
-            "One valid NWB file must be present in the input directory"
-        )
+        raise AssertionError("One valid NWB file must be present in the input directory")
     input_nwb_path = input_nwb_paths[0]
     processed_path = find_latest_processed_folder(args.input_directory)
     raw_path = find_latest_raw_folder(args.input_directory)
@@ -588,7 +658,6 @@ def get_processed_file_paths(processed_path: Path, raw_path: Path, fovs: List) -
         file_paths["planes"][plane_path]["processed_plane_path"] = plane_path
     file_paths["processed_path"] = processed_path
     file_paths["raw_path"] = raw_path
-    print("GET PROC FILE", file_paths)
     return file_paths
 
 
@@ -682,14 +751,14 @@ def parse_args() -> argparse.Namespace:
         "--input_directory",
         type=str,
         help="Path to the input directory",
-        default="../data/",
+        default="/data/",
     )
 
     parser.add_argument(
         "--output_directory",
         type=str,
         help="Path to the output file",
-        default="../results/",
+        default="/results/",
     )
     return parser.parse_args()
 
@@ -721,11 +790,19 @@ if __name__ == "__main__":
         raise FileNotFoundError(name_space)
     OphysMetadata = load_pynwb_extension("", name_space)
     io = io_class(
-        str(output_nwb_fp), "r+", load_namespaces=False, extensions=name_space,
+        str(output_nwb_fp),
+        "r+",
+        load_namespaces=False,
+        extensions=name_space,
     )
     nwb_file = io.read()
     nwbfile = nwb_ophys(
-        nwb_file, file_paths, ophys_fovs, rig_data, session_data, subject_data,
+        nwb_file,
+        file_paths,
+        ophys_fovs,
+        rig_data,
+        session_data,
+        subject_data,
     )
     # Add plane metadata for each plane
     for fov in ophys_fovs:
