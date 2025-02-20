@@ -821,4 +821,4 @@ if __name__ == "__main__":
     # write out
     output_directory = Path(args.output_directory).absolute()
     logging.info(f"Writing to {output_directory}")
-    io.write(nwb_file)
+    io.write(nwb_file, link_data =  False)
