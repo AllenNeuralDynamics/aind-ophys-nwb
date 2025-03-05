@@ -131,6 +131,14 @@ def load_sparse_array(h5_file):
     return pixelmasks
 
 
+def convert_rois_to_segmentation_mask(h5_file):
+    pixelmasks = load_sparse_array(h5_file)
+    segmetation_mask = np.zeros(pixelmasks.shape[1:], dtype="i2")
+    contains_roi = pixelmasks.sum(0) > 0
+    segmetation_mask[contains_roi] = np.argmax(pixelmasks[:, contains_roi], 0) + 1
+    return segmetation_mask
+
+
 def get_segementation_approach(extraction_h5: Path) -> SegmentationApproach:
     """Get the segmentation approach from the extraction file
 
@@ -339,7 +347,9 @@ def nwb_ophys(
                 h5_key="masks",
             )
         else:
-            raise NotImplementedError("Cannot process functional segmentation")
+            segmetation_mask = convert_rois_to_segmentation_mask(
+                file_paths["planes"][plane_name]["extraction_h5"]
+            )
         mask_img = GrayscaleImage(
             name="segmentation_mask_image",
             data=segmetation_mask,
