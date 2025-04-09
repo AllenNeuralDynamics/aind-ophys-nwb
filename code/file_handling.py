@@ -61,6 +61,8 @@ def singleplane_session_data_files(input_path):
     subfolders = [f for f in input_path.iterdir() if f.is_dir()]
     if len(subfolders) == 1:
         singleplane_data_path = subfolders[0]
+    if len(subfolders) == 0:
+        singleplane_data_path = input_path
     if len(subfolders) != 1 and len(subfolders) != 0:
         raise ValueError(f"Expected exactly one or zero subfolder in {input_path}, found {len(subfolders)}")
 
