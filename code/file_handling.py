@@ -42,6 +42,33 @@ MULTIPLANE_FILE_PARTS = {
     "classifier_h5": "classification.h5",
 }
 
+def singleplane_session_data_files(input_path):
+    """Find all data files in a single-plane session directory.
+
+    Parameters
+    ----------
+    input_path : str or Path
+        The parent processed directory containing the single-plane data.
+
+    Returns
+    -------
+    dict
+        A dictionary containing the file paths for each data file.
+    """
+    input_path = Path(input_path)
+
+    # There should be exactly one subfolder inside the single-plane parent folder
+    subfolders = [f for f in input_path.iterdir() if f.is_dir()]
+    if len(subfolders) != 1:
+        raise ValueError(f"Expected exactly one subfolder in {input_path}, found {len(subfolders)}")
+
+    singleplane_data_path = subfolders[0]  # This is the actual data directory
+
+    data_files = {}
+    for key, value in MULTIPLANE_FILE_PARTS.items():
+        data_files[key] = find_data_file(singleplane_data_path, value)  # Search in the subfolder
+
+    return data_files
 
 def multiplane_session_data_files(input_path, plane):
     """Find all data files in a multiplane session directory.
@@ -162,7 +189,7 @@ def get_sync_file_path(input_path, verbose=False):
 def plane_paths_from_session(
     session_path: Union[Path, str], data_level: str = "raw", fovs: List = []
 ) -> list:
-    """Get plane paths from a session directory
+    """Get plane paths from a session directory, supporting both singleplane and multiplane cases.
 
     Parameters
     ----------
@@ -178,25 +205,24 @@ def plane_paths_from_session(
     list
         List of plane paths
     """
-    if isinstance(session_path, str):
-        session_path = Path(session_path)
-    if fovs != [] and data_level == "processed":
-        planes = []
-        for fov in fovs:
-            fov_plane = fov["targeted_structure"]
-            fov_index = fov["index"]
-            fov_pair = fov_plane + "_" + str(fov_index)
-            planes.append(fov_pair)
-    elif fovs == [] and data_level == "processed":
-        logger.error("Processed data requires ophys fovs")
-    if data_level == "raw":
-        planes = [f for f in (session_path / "pophys").glob("*") if f.is_dir()]
-    return planes
+    session_path = Path(session_path) if isinstance(session_path, str) else session_path
 
+    if data_level == "processed":
+        if not fovs:
+            logger.error("Processed data requires ophys fovs")
+            return []
+        return [session_path / f"{fov['targeted_structure']}_{fov['index']}" for fov in fovs]
 
-def get_multiplane_processed_file_paths(processed_path: Union[Path, str]) -> dict:
+    # For raw data, check if the session contains plane subdirectories or is a singleplane session
+    possible_planes = list((session_path / "pophys").glob("*")) if (session_path / "pophys").exists() else []
+    
+    if possible_planes and all(p.is_dir() for p in possible_planes):
+        return possible_planes  # Multiplane session (folders exist)
+    return [session_path]  # Singleplane session (no subdirectories)
+
+def get_ophys_processed_file_paths(processed_path: Union[Path, str]) -> dict:
     """
-    Create a dictionary of file paths for a processed ophys session.
+    Create a dictionary of file paths for a processed ophys session, supporting both singleplane and multiplane.
 
     Parameters
     ----------
@@ -206,23 +232,21 @@ def get_multiplane_processed_file_paths(processed_path: Union[Path, str]) -> dic
     Returns
     -------
     dict
-        A dictionary containing file paths for each plane and the processed path.
+        A dictionary containing file paths for each plane (or the session folder in singleplane).
     """
     processed_path = Path(processed_path)
-    processed_plane_paths = plane_paths_from_session(
-        processed_path, data_level="processed"
-    )
+
+    processed_plane_paths = plane_paths_from_session(processed_path, data_level="processed")
 
     file_paths = {"planes": {}, "processed_path": processed_path}
 
     for plane_path in processed_plane_paths:
         plane_path = Path(plane_path)
         plane = plane_path.name
-        file_paths["planes"][plane] = multiplane_session_data_files(plane_path)
+        file_paths["planes"][plane] = multiplane_session_data_files(plane_path)  # Replace with singleplane logic if needed
         file_paths["planes"][plane]["processed_plane_path"] = plane_path
 
     return file_paths
-
 
 ####################################################################################################
 # METADATA EXTRACTION
