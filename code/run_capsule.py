@@ -1347,7 +1347,7 @@ if __name__ == "__main__":
         session_json = json.load(f)
     frame_rate = get_frame_rate(session_json)
     paths = glob.glob("/data/processed/*/motion_correction/trial_locations.json") + \
-            glob.glob("/data/processed/*/trial_locations.json")
+            glob.glob("/data/processed/trial_locations.json")
 
     # Grab the first if any found
     sp_interval_path = paths[0] if paths else None
