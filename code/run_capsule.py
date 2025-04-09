@@ -1341,7 +1341,7 @@ if __name__ == "__main__":
 
         nwb_file = add_tiffs_to_nwb(r'/data/single-plane-ophys_772346_2025-03-05_09-22-18/pophys/',suffix, nwb_file)
     '''
-    session_json_path = "/data/single-plane-ophys/session.json"
+    session_json_path = "/data/raw/session.json"
 
     with open(session_json_path, "r") as f:
         session_json = json.load(f)
