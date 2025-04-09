@@ -59,10 +59,12 @@ def singleplane_session_data_files(input_path):
 
     # There should be exactly one subfolder inside the single-plane parent folder
     subfolders = [f for f in input_path.iterdir() if f.is_dir()]
-    if len(subfolders) != 1:
-        raise ValueError(f"Expected exactly one subfolder in {input_path}, found {len(subfolders)}")
+    if len(subfolders) == 1:
+        singleplane_data_path = subfolders[0]
+    if len(subfolders) != 1 and len(subfolders) != 0:
+        raise ValueError(f"Expected exactly one or zero subfolder in {input_path}, found {len(subfolders)}")
 
-    singleplane_data_path = subfolders[0]  # This is the actual data directory
+  # This is the actual data directory
 
     data_files = {}
     for key, value in MULTIPLANE_FILE_PARTS.items():
