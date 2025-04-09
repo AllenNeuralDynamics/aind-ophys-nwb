@@ -1346,8 +1346,11 @@ if __name__ == "__main__":
     with open(session_json_path, "r") as f:
         session_json = json.load(f)
     frame_rate = get_frame_rate(session_json)
-    sp_interval_path = glob.glob("/data/processed/*/motion_correction/trial_locations.json")
-    sp_interval_path = sp_interval_path[0]
+    paths = glob.glob("/data/processed/*/motion_correction/trial_locations.json") + \
+            glob.glob("/data/processed/*/trial_locations.json")
+
+    # Grab the first if any found
+    sp_interval_path = paths[0] if paths else None
 
     nwb_file = add_intervals_sp_nwb(sp_interval_path, frame_rate, nwb_file)
 
