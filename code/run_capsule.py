@@ -58,7 +58,7 @@ def load_pynwb_extension(schema, path):
 def grab_suffixes(directory):
     """
     Finds unique suffixes from CSV files and checks if a corresponding TIFF file exists.
-    
+
     :param directory: Path to the directory containing .csv and .tif files.
     :return: A set of valid suffixes that have both .csv and .tif files.
     """
@@ -75,9 +75,10 @@ def grab_suffixes(directory):
             tiff_suffixes.add(suffix)
 
     # Find suffixes that have both CSV and TIFF files
-    valid_suffixes = csv_suffixes & tiff_suffixes  
+    valid_suffixes = csv_suffixes & tiff_suffixes
 
     return valid_suffixes
+
 
 def add_tiffs_to_nwb(directory, suffix, nwb_file):
     """
@@ -92,27 +93,33 @@ def add_tiffs_to_nwb(directory, suffix, nwb_file):
     print(f"Processing suffix: {suffix}")
 
     # Get all .tif files matching the suffix
-    tiff_files = sorted([f for f in os.listdir(directory) if fnmatch.fnmatch(f, f"*{suffix}*.tif")])
-    
+    tiff_files = sorted(
+        [f for f in os.listdir(directory) if fnmatch.fnmatch(f, f"*{suffix}*.tif")]
+    )
+
     if not tiff_files:
         raise ValueError(f"No TIFF files found with suffix '{suffix}' in {directory}")
 
     # Find the first associated CSV file
-    csv_files = sorted([f for f in os.listdir(directory) if fnmatch.fnmatch(f, f"*{suffix}*.csv")])
-    
+    csv_files = sorted(
+        [f for f in os.listdir(directory) if fnmatch.fnmatch(f, f"*{suffix}*.csv")]
+    )
+
     if not csv_files:
         raise ValueError(f"No CSV file found for suffix '{suffix}' in {directory}")
-    
+
     csv_path = os.path.join(directory, csv_files[0])  # Use the first CSV file found
 
     # Load frame numbers and timestamps from CSV
     df = pd.read_csv(csv_path)  # Assuming CSV has "frameNumber" and "timestamp" columns
-    
-    if 'frameNumber' not in df.columns or 'timestamp' not in df.columns:
+
+    if "frameNumber" not in df.columns or "timestamp" not in df.columns:
         return nwb_file
 
-    valid_frames = set(df['frameNumber'])  # The frames we want to extract
-    frame_to_time = dict(zip(df['frameNumber'], df['timestamp']))  # Map frameNumber to timestamp
+    valid_frames = set(df["frameNumber"])  # The frames we want to extract
+    frame_to_time = dict(
+        zip(df["frameNumber"], df["timestamp"])
+    )  # Map frameNumber to timestamp
 
     images = []
     timestamps = []
@@ -121,7 +128,7 @@ def add_tiffs_to_nwb(directory, suffix, nwb_file):
     for filename in tiff_files:
         filepath = os.path.join(directory, filename)
         reader = imageio.get_reader(filepath)  # Open TIFF stack reader
-        
+
         for frame_index, frame in enumerate(reader):
             if frame_index in valid_frames:  # Only keep frames from CSV
                 images.append(frame)
@@ -136,12 +143,13 @@ def add_tiffs_to_nwb(directory, suffix, nwb_file):
         data=images,  # Store images as a list
         unit="pixels",
         format="raw",
-        timestamps=timestamps  # Assign timestamps from CSV
+        timestamps=timestamps,  # Assign timestamps from CSV
     )
 
     # Add ImageSeries to NWB
     nwb_file.add_acquisition(img_series)
     return nwb_file
+
 
 def load_signals(
     h5_file: Path, plane_segmentation: ImageSegmentation, h5_group=None, h5_key=None
@@ -248,9 +256,7 @@ def get_segementation_approach(extraction_h5: Path) -> SegmentationApproach:
 
 
 def get_microscope(
-    nwbfile: pynwb.NWBFile,
-    rig_json_data: dict,
-    session_json_data: dict,
+    nwbfile: pynwb.NWBFile, rig_json_data: dict, session_json_data: dict,
 ) -> Tuple[pynwb.device.Device, OpticalChannel]:
     """Get microscope metadata for the NWB file
 
@@ -281,11 +287,10 @@ def get_microscope(
         manufacturer=microscope_manufacturer,
     )
     optical_channel = OpticalChannel(
-        name=oc1_name,
-        description=oc1_desc,
-        emission_lambda=oc1_el,
+        name=oc1_name, description=oc1_desc, emission_lambda=oc1_el,
     )
     return device, optical_channel
+
 
 def nwb_ophys_single_plane(
     nwbfile: pynwb.NWBFile,
@@ -296,7 +301,7 @@ def nwb_ophys_single_plane(
     frame_rate: float,
 ) -> Tuple[pynwb.NWBFile, dict]:
     """Create an NWB file for single-plane ophys data using frame rate instead of timestamps
-    
+
     Parameters
     ----------
     nwbfile : pynwb.NWBFile
@@ -311,7 +316,7 @@ def nwb_ophys_single_plane(
         The subject metadata
     frame_rate : float
         The frame rate in Hz (frames per second)
-        
+
     Returns
     -------
     pynwb.NWBFile
@@ -322,21 +327,27 @@ def nwb_ophys_single_plane(
     device, optical_channel = get_microscope(nwbfile, rig_json_data, session_json_data)
 
     # Get the single plane name from file_paths
-    plane_name = list(file_paths['planes'].keys())[0]
+    plane_name = list(file_paths["planes"].keys())[0]
     logging.info(f"Processing single plane: {plane_name}")
-    
+
     # Create imaging plane with appropriate metadata
-    location = "Structure: " + "Unknown Structure" + " Depth: " + str(0)  # Update if available in metadata
-    
-    ophys_module = nwbfile.create_processing_module(name=plane_name, description="Single-plane ophys processing module")
-    
+    location = (
+        "Structure: " + "Unknown Structure" + " Depth: " + str(0)
+    )  # Update if available in metadata
+
+    ophys_module = nwbfile.create_processing_module(
+        name=plane_name, description="Single-plane ophys processing module"
+    )
+
     imaging_plane = nwbfile.create_imaging_plane(
         name=plane_name,
         optical_channel=optical_channel,
         imaging_rate=frame_rate,
         description="Single-photon imaging plane",
         device=device,
-        excitation_lambda=float(session_json_data["data_streams"][0]["light_sources"][0]["wavelength"]),
+        excitation_lambda=float(
+            session_json_data["data_streams"][0]["light_sources"][0]["wavelength"]
+        ),
         indicator=subject_json_data["genotype"],
         location=location,
         grid_spacing=[1.0, 1.0],  # Update if available
@@ -344,14 +355,14 @@ def nwb_ophys_single_plane(
         origin_coords=[0.0, 0.0, 0.0],
         origin_coords_unit="meters",
     )
-    
+
     # Add ImageSegmentation
     img_seg = ImageSegmentation(name="image_segmentation")
-    
+
     # Determine segmentation approach
     try:
         segmentation_approach = get_segementation_approach(
-            file_paths['planes'][plane_name]["extraction_h5"]
+            file_paths["planes"][plane_name]["extraction_h5"]
         )
         plane_seg_approach = segmentation_approach.value["method"]
         plane_seg_descr = segmentation_approach.value["description"]
@@ -359,51 +370,41 @@ def nwb_ophys_single_plane(
         logging.warning(f"Could not determine segmentation approach: {e}")
         plane_seg_approach = "unknown"
         plane_seg_descr = "Unknown segmentation method"
-    
+
     # Create plane segmentation
     try:
         # Try to load classifier data
         soma_predictions = load_generic_group(
-            file_paths['planes'][plane_name]["classifier_h5"],
+            file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="soma",
             h5_key="predictions",
         )
         soma_probabilities = load_generic_group(
-            file_paths['planes'][plane_name]["classifier_h5"],
+            file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="soma",
             h5_key="probabilities",
         )
         dendrite_predictions = load_generic_group(
-            file_paths['planes'][plane_name]["classifier_h5"],
+            file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="dendrites",
             h5_key="predictions",
         )
         dendrite_probabilities = load_generic_group(
-            file_paths['planes'][plane_name]["classifier_h5"],
+            file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="dendrites",
             h5_key="probabilities",
         )
-        
+
         plane_segmentation = img_seg.create_plane_segmentation(
             name="roi_table",
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
             columns=[
+                VectorData(name="is_soma", description="Soma predictions",),
+                VectorData(name="soma_probability", description="Soma probabilities",),
+                VectorData(name="is_dendrite", description="Dendrite predictions",),
                 VectorData(
-                    name="is_soma",
-                    description="Soma predictions",
-                ),
-                VectorData(
-                    name="soma_probability",
-                    description="Soma probabilities",
-                ),
-                VectorData(
-                    name="is_dendrite",
-                    description="Dendrite predictions",
-                ),
-                VectorData(
-                    name="dendrite_probability",
-                    description="Dendrite probabilities",
+                    name="dendrite_probability", description="Dendrite probabilities",
                 ),
             ],
             colnames=[
@@ -413,15 +414,15 @@ def nwb_ophys_single_plane(
                 "dendrite_probability",
             ],
         )
-        
+
         # Add ROIs
         rois_shape = load_generic_group(
-            file_paths['planes'][plane_name]["extraction_h5"],
+            file_paths["planes"][plane_name]["extraction_h5"],
             h5_group="rois",
             h5_key="shape",
         )
         for idx, pixel_mask in enumerate(
-            load_sparse_array(file_paths['planes'][plane_name]["extraction_h5"])
+            load_sparse_array(file_paths["planes"][plane_name]["extraction_h5"])
         ):
 
             plane_segmentation.add_roi(
@@ -440,18 +441,18 @@ def nwb_ophys_single_plane(
             imaging_plane=imaging_plane,
         )
         for idx, pixel_mask in enumerate(
-            load_sparse_array(file_paths['planes'][plane_name]["extraction_h5"])
+            load_sparse_array(file_paths["planes"][plane_name]["extraction_h5"])
         ):
 
-            plane_segmentation.add_roi(image_mask = pixel_mask)
-    
+            plane_segmentation.add_roi(image_mask=pixel_mask)
+
     ophys_module.add(img_seg)
-    
+
     # Add projections and images
     try:
         # Add average and max projections if available
         avg_projection = plt.imread(
-            file_paths['planes'][plane_name]["average_projection_png"]
+            file_paths["planes"][plane_name]["average_projection_png"]
         )
         avg_img = GrayscaleImage(
             name="average_projection",
@@ -459,9 +460,9 @@ def nwb_ophys_single_plane(
             resolution=1.0,  # Update if available
             description="Average intensity projection of entire session",
         )
-        
+
         max_projection = plt.imread(
-            file_paths['planes'][plane_name]["max_projection_png"]
+            file_paths["planes"][plane_name]["max_projection_png"]
         )
         max_img = GrayscaleImage(
             name="max_projection",
@@ -469,11 +470,11 @@ def nwb_ophys_single_plane(
             resolution=1.0,  # Update if available
             description="Max intensity projection of entire session",
         )
-        
+
         # Try to add segmentation mask if available
         if segmentation_approach == SegmentationApproach.SUITE2P_ANATOMICAL:
             segmentation_mask = load_generic_group(
-                file_paths['planes'][plane_name]["extraction_h5"],
+                file_paths["planes"][plane_name]["extraction_h5"],
                 h5_group="cellpose",
                 h5_key="masks",
             )
@@ -494,25 +495,25 @@ def nwb_ophys_single_plane(
                 images=[avg_img, max_img],
                 description="Summary images of the ophys movie",
             )
-        
+
         ophys_module.add(images)
     except Exception as e:
         logging.warning(f"Error adding projection images: {e}")
-    '''
+    """
     if file_paths['planes'][plane_name]["classifier_h5"] is None:
         return nwbfile
-    '''
+    """
     # Add timeseries data
     try:
         # ROI traces
         roi_traces, roi_names = load_signals(
-            file_paths['planes'][plane_name]["extraction_h5"],
+            file_paths["planes"][plane_name]["extraction_h5"],
             plane_segmentation,
             h5_group="traces",
             h5_key="roi",
         )
         print(roi_traces, roi_names)
-        
+
         # Create time series using frame rate
         roi_traces_series = RoiResponseSeries(
             name="ROI_fluorescence",
@@ -522,15 +523,15 @@ def nwb_ophys_single_plane(
             rate=frame_rate,
             starting_time=0.0,
         )
-        
+
         # Neuropil traces
         neuropil_traces, roi_names = load_signals(
-            file_paths['planes'][plane_name]["extraction_h5"],
+            file_paths["planes"][plane_name]["extraction_h5"],
             plane_segmentation,
             h5_group="traces",
             h5_key="neuropil",
         )
-        
+
         neuropil_traces_series = RoiResponseSeries(
             name="neuropil_fluorescence",
             data=neuropil_traces.T,
@@ -539,17 +540,16 @@ def nwb_ophys_single_plane(
             rate=frame_rate,
             starting_time=0.0,
         )
-        
-        
+
         # Neuropil corrected traces if available
         try:
             neuropil_corrected, roi_names = load_signals(
-                file_paths['planes'][plane_name]["extraction_h5"],
+                file_paths["planes"][plane_name]["extraction_h5"],
                 plane_segmentation,
                 h5_group="traces",
                 h5_key="corrected",
             )
-            
+
             neuropil_corrected_series = RoiResponseSeries(
                 name="neuropil_corrected",
                 data=neuropil_corrected.T,
@@ -558,20 +558,19 @@ def nwb_ophys_single_plane(
                 rate=frame_rate,
                 starting_time=0.0,
             )
-            
-            
+
             ophys_module.add(neuropil_corrected_series)
         except Exception as e:
             logging.warning(f"Error adding neuropil corrected traces: {e}")
-        
+
         # DfOverF traces if available
         try:
             dfof_traces, roi_names = load_signals(
-                file_paths['planes'][plane_name]["dff_h5"],
+                file_paths["planes"][plane_name]["dff_h5"],
                 plane_segmentation,
                 h5_key="data",
             )
-            
+
             dfof_traces_series = RoiResponseSeries(
                 name="dff",
                 data=dfof_traces.T,
@@ -580,23 +579,21 @@ def nwb_ophys_single_plane(
                 rate=frame_rate,
                 starting_time=0.0,
             )
-            
 
-            ophys_module.add(DfOverF(
-                roi_response_series=dfof_traces_series, 
-                name="dff"
-            ))
+            ophys_module.add(
+                DfOverF(roi_response_series=dfof_traces_series, name="dff")
+            )
         except Exception as e:
             logging.warning(f"Error adding DfOverF traces: {e}")
-        
+
         # Event traces if available
         try:
             event_traces, roi_names = load_signals(
-                file_paths['planes'][plane_name]["events_oasis_h5"],
+                file_paths["planes"][plane_name]["events_oasis_h5"],
                 plane_segmentation,
                 h5_key="events",
             )
-            
+
             event_traces_series = RoiResponseSeries(
                 name="event",
                 data=event_traces.T,
@@ -605,25 +602,23 @@ def nwb_ophys_single_plane(
                 rate=frame_rate,
                 starting_time=0.0,
             )
-            
 
-            
             ophys_module.add(event_traces_series)
         except Exception as e:
             logging.warning(f"Error adding event traces: {e}")
-        
+
         # Add the base fluorescence data to the module
-        ophys_module.add(Fluorescence(
-            roi_response_series=roi_traces_series, 
-            name="raw"
-        ))
+        ophys_module.add(
+            Fluorescence(roi_response_series=roi_traces_series, name="raw")
+        )
         ophys_module.add(neuropil_traces_series)
-        
+
     except Exception as e:
         logging.error(f"Error adding timeseries data: {e}")
         raise
-    
+
     return nwbfile
+
 
 def nwb_ophys(
     nwbfile: pynwb.NWBFile,
@@ -721,21 +716,11 @@ def nwb_ophys(
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
             columns=[
+                VectorData(name="is_soma", description="Soma predictions",),
+                VectorData(name="soma_probability", description="Soma probabilities",),
+                VectorData(name="is_dendrite", description="Dendrite predictions",),
                 VectorData(
-                    name="is_soma",
-                    description="Soma predictions",
-                ),
-                VectorData(
-                    name="soma_probability",
-                    description="Soma probabilities",
-                ),
-                VectorData(
-                    name="is_dendrite",
-                    description="Dendrite predictions",
-                ),
-                VectorData(
-                    name="dendrite_probability",
-                    description="Dendrite probabilities",
+                    name="dendrite_probability", description="Dendrite probabilities",
                 ),
             ],
             colnames=[
@@ -930,10 +915,15 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
 
     # Look for folders with "multiplane-ophys" and "processed" (multiplane case)
     multiplane_folders = sorted(
-        [folder for folder in input_directory.glob("*") if folder.is_dir() 
-         and "multiplane-ophys" in folder.name and "processed" in folder.name],
+        [
+            folder
+            for folder in input_directory.glob("*")
+            if folder.is_dir()
+            and "multiplane-ophys" in folder.name
+            and "processed" in folder.name
+        ],
         key=lambda x: x.stat().st_mtime,
-        reverse=True
+        reverse=True,
     )
 
     if multiplane_folders:
@@ -941,15 +931,21 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
 
     # Look for a general "processed" folder (singleplane case)
     processed_folders = sorted(
-        [folder for folder in input_directory.glob("*") if folder.is_dir() and "processed" in folder.name],
+        [
+            folder
+            for folder in input_directory.glob("*")
+            if folder.is_dir() and "processed" in folder.name
+        ],
         key=lambda x: x.stat().st_mtime,
-        reverse=True
+        reverse=True,
     )
 
     if processed_folders:
         return processed_folders[0]  # Latest processed singleplane folder
 
-    raise FileNotFoundError("No matching processed folder found in the input directory.")
+    raise FileNotFoundError(
+        "No matching processed folder found in the input directory."
+    )
 
 
 def find_latest_raw_folder(input_directory: Path) -> Path:
@@ -970,10 +966,15 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
 
     # Look for folders with "multiplane-ophys" but NOT "processed" (multiplane case)
     multiplane_folders = sorted(
-        [folder for folder in input_directory.glob("*") if folder.is_dir() 
-         and "multiplane-ophys" in folder.name and "processed" not in folder.name],
+        [
+            folder
+            for folder in input_directory.glob("*")
+            if folder.is_dir()
+            and "multiplane-ophys" in folder.name
+            and "processed" not in folder.name
+        ],
         key=lambda x: x.stat().st_mtime,
-        reverse=True
+        reverse=True,
     )
 
     if multiplane_folders:
@@ -981,9 +982,13 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
 
     # Look for general raw folders (singleplane case)
     raw_folders = sorted(
-        [folder for folder in input_directory.glob("*") if folder.is_dir() and "raw" in folder.name],
+        [
+            folder
+            for folder in input_directory.glob("*")
+            if folder.is_dir() and "raw" in folder.name
+        ],
         key=lambda x: x.stat().st_mtime,
-        reverse=True
+        reverse=True,
     )
 
     if raw_folders:
@@ -991,9 +996,13 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
 
     # If no explicit "raw" folder, assume any folder without "processed" is raw (singleplane fallback)
     all_folders = sorted(
-        [folder for folder in input_directory.glob("*") if folder.is_dir() and "processed" not in folder.name],
+        [
+            folder
+            for folder in input_directory.glob("*")
+            if folder.is_dir() and "processed" not in folder.name
+        ],
         key=lambda x: x.stat().st_mtime,
-        reverse=True
+        reverse=True,
     )
 
     if all_folders:
@@ -1080,7 +1089,9 @@ def get_data_paths(input_directory: Path) -> Tuple[Path, Path, Path]:
     """
     input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
     if len(input_nwb_paths) != 1:
-        raise AssertionError("One valid NWB file must be present in the input directory")
+        raise AssertionError(
+            "One valid NWB file must be present in the input directory"
+        )
     input_nwb_path = input_nwb_paths[0]
     processed_path = find_latest_processed_folder(args.input_directory)
     raw_path = find_latest_raw_folder(args.input_directory)
@@ -1113,7 +1124,9 @@ def get_processed_file_paths(processed_path: Path, raw_path: Path, fovs: List) -
     if is_singleplane:
         # Singleplane case: processed_path itself contains the data
         plane_key = processed_path.name  # Use the folder name as the key
-        file_paths["planes"][plane_key] = file_handling.singleplane_session_data_files(processed_path)
+        file_paths["planes"][plane_key] = file_handling.singleplane_session_data_files(
+            processed_path
+        )
         file_paths["planes"][plane_key]["processed_plane_path"] = processed_path
     else:
         # Multiplane case: Extract plane folders
@@ -1122,13 +1135,16 @@ def get_processed_file_paths(processed_path: Path, raw_path: Path, fovs: List) -
         )
         for plane_path in processed_plane_paths:
             plane_name = plane_path.name  # e.g., 'visp0', 'visp1'
-            file_paths["planes"][plane_name] = file_handling.multiplane_session_data_files(plane_path)
+            file_paths["planes"][
+                plane_name
+            ] = file_handling.multiplane_session_data_files(plane_path)
             file_paths["planes"][plane_name]["processed_plane_path"] = plane_path
 
     file_paths["processed_path"] = processed_path
     file_paths["raw_path"] = raw_path
 
     return file_paths
+
 
 def get_metadata(raw_path: Path) -> Tuple[dict, dict, dict]:
     """Get the metadata from the raw folder
@@ -1209,10 +1225,11 @@ def get_sync_timestamps(raw_path: Path) -> np.array:
     if not sync_fp:
         sync_fp = next(raw_path.rglob("*ophys/*.h5"), None)
 
-
     if not sync_fp:
         logging.error("Sync file not found in behavior, *ophys, or single-plane folder")
-        raise FileNotFoundError("Sync file not found in behavior, *ophys, or single-plane folder")
+        raise FileNotFoundError(
+            "Sync file not found in behavior, *ophys, or single-plane folder"
+        )
 
     return _sync_timestamps(sync_fp)
 
@@ -1239,7 +1256,7 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
     for base_name, intervals in tiff_groups.items():
         # Create a new TimeIntervals object for this group
         trial_intervals = TimeIntervals(name=base_name)
-        
+
         # Add the rows for this group of TIFFs
         for start_time, stop_time in intervals:
             trial_intervals.add_row(start_time=start_time, stop_time=stop_time)
@@ -1248,6 +1265,7 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
         nwbfile.add_time_intervals(trial_intervals)
 
     return nwbfile
+
 
 def get_frame_rate(session: dict):
     """Attempt to pull frame rate from session.json
@@ -1271,6 +1289,7 @@ def get_frame_rate(session: dict):
     if isinstance(frame_rate_hz, str):
         frame_rate_hz = float(frame_rate_hz)
     return frame_rate_hz
+
 
 def parse_args() -> argparse.Namespace:
     """
@@ -1310,20 +1329,22 @@ if __name__ == "__main__":
     session_data, subject_data, rig_data = get_metadata(raw_data_fp)
     ophys_fovs = session_data["data_streams"][1]["ophys_fovs"]
     file_paths = get_processed_file_paths(processed_data_fp, raw_data_fp, ophys_fovs)
-    #sync_timestamps = get_sync_timestamps(raw_data_fp)
-    #ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
+    # sync_timestamps = get_sync_timestamps(raw_data_fp)
+    # ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
 
     single_plane = False
     multiplane = False
-    json_path = r'/data/raw/data_description.json'
-    with open(json_path, 'r') as f:
+    json_path = r"/data/raw/data_description.json"
+    with open(json_path, "r") as f:
         data_description = json.load(f)
 
-        if data_description.get("platform", {}).get("abbreviation") == "single-plane-ophys":
+        if (
+            data_description.get("platform", {}).get("abbreviation")
+            == "single-plane-ophys"
+        ):
             single_plane = True
         else:
             multiplane = True
-
 
     current_time = datetime.now()
     formatted_date = current_time.strftime("%Y-%m-%d")
@@ -1337,12 +1358,12 @@ if __name__ == "__main__":
     name_space = "/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml"
     if not Path(name_space).is_file():
         raise FileNotFoundError(name_space)
-    #OphysMetadata = load_pynwb_extension("", name_space)
+    # OphysMetadata = load_pynwb_extension("", name_space)
     io = io_class(
         str(output_nwb_fp),
         "r+",
         load_namespaces=True,
-        #extensions=name_space,
+        # extensions=name_space,
     )
     nwb_file = io.read()
     if single_plane:
@@ -1351,8 +1372,9 @@ if __name__ == "__main__":
         with open(session_json_path, "r") as f:
             session_json = json.load(f)
         frame_rate = get_frame_rate(session_json)
-        paths = glob.glob("/data/processed/*/motion_correction/trial_locations.json") + \
-                glob.glob("/data/processed/trial_locations.json")
+        paths = glob.glob(
+            "/data/processed/*/motion_correction/trial_locations.json"
+        ) + glob.glob("/data/processed/trial_locations.json")
 
         # Grab the first if any found
         sp_interval_path = paths[0] if paths else None
@@ -1360,23 +1382,13 @@ if __name__ == "__main__":
         nwb_file = add_intervals_sp_nwb(sp_interval_path, frame_rate, nwb_file)
 
         nwb_file = nwb_ophys_single_plane(
-            nwb_file,
-            file_paths,
-            rig_data,
-            session_data,
-            subject_data,
-            frame_rate        
+            nwb_file, file_paths, rig_data, session_data, subject_data, frame_rate
         )
         io.write(nwb_file)
-    
-    elif multiplane: 
+
+    elif multiplane:
         nwbfile = nwb_ophys(
-            nwb_file,
-            file_paths,
-            ophys_fovs,
-            rig_data,
-            session_data,
-            subject_data,
+            nwb_file, file_paths, ophys_fovs, rig_data, session_data, subject_data,
         )
         # Add plane metadata for each plane
         for fov in ophys_fovs:
