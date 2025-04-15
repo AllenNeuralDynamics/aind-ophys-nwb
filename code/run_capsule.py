@@ -1313,6 +1313,18 @@ if __name__ == "__main__":
     #sync_timestamps = get_sync_timestamps(raw_data_fp)
     #ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
 
+    single_plane = False
+    multiplane = False
+    json_path = r'/data/raw/data_description.json'
+    with open(json_path, 'r') as f:
+        data_description = json.load(f)
+
+        if data_description.get("platform", {}).get("abbreviation") == "single-plane-ophys":
+            single_plane = True
+        else:
+            multiplane = True
+
+
     current_time = datetime.now()
     formatted_date = current_time.strftime("%Y-%m-%d")
     formatted_time = current_time.strftime("%H-%M-%S")
@@ -1332,64 +1344,55 @@ if __name__ == "__main__":
         load_namespaces=True,
         #extensions=name_space,
     )
-    file_path = "/data/single-plane-ophys/pophys/suite2p_BCI/plane0/iscell.npy"
-    #data = np.load(file_path, allow_pickle=True)
-    #suffixes = grab_suffixes(r'/data/single-plane-ophys_772346_2025-03-05_09-22-18/pophys/')
     nwb_file = io.read()
-    '''
-    for suffix in suffixes:
+    if single_plane:
+        session_json_path = "/data/raw/session.json"
 
-        nwb_file = add_tiffs_to_nwb(r'/data/single-plane-ophys_772346_2025-03-05_09-22-18/pophys/',suffix, nwb_file)
-    '''
-    session_json_path = "/data/raw/session.json"
+        with open(session_json_path, "r") as f:
+            session_json = json.load(f)
+        frame_rate = get_frame_rate(session_json)
+        paths = glob.glob("/data/processed/*/motion_correction/trial_locations.json") + \
+                glob.glob("/data/processed/trial_locations.json")
 
-    with open(session_json_path, "r") as f:
-        session_json = json.load(f)
-    frame_rate = get_frame_rate(session_json)
-    paths = glob.glob("/data/processed/*/motion_correction/trial_locations.json") + \
-            glob.glob("/data/processed/trial_locations.json")
+        # Grab the first if any found
+        sp_interval_path = paths[0] if paths else None
 
-    # Grab the first if any found
-    sp_interval_path = paths[0] if paths else None
+        nwb_file = add_intervals_sp_nwb(sp_interval_path, frame_rate, nwb_file)
 
-    nwb_file = add_intervals_sp_nwb(sp_interval_path, frame_rate, nwb_file)
-
-    nwb_file = nwb_ophys_single_plane(
-        nwb_file,
-        file_paths,
-        rig_data,
-        session_data,
-        subject_data,
-        frame_rate        
-    )
-
-
-    io.write(nwb_file)
-    '''
-    nwbfile = nwb_ophys(
-        nwb_file,
-        file_paths,
-        ophys_fovs,
-        rig_data,
-        session_data,
-        subject_data,
-    )
-    # Add plane metadata for each plane
-    for fov in ophys_fovs:
-        plane_metadata = OphysMetadata(
-            name=f'{fov["targeted_structure"]}_{fov["index"]}',
-            imaging_depth=str(fov["imaging_depth"]),
-            imaging_plane_group=str(fov["coupled_fov_index"]),
-            field_of_view_width=str(fov["fov_width"]),
-            field_of_view_height=str(fov["fov_height"]),
+        nwb_file = nwb_ophys_single_plane(
+            nwb_file,
+            file_paths,
+            rig_data,
+            session_data,
+            subject_data,
+            frame_rate        
         )
+        io.write(nwb_file)
+    
+    elif multiplane: 
+        nwbfile = nwb_ophys(
+            nwb_file,
+            file_paths,
+            ophys_fovs,
+            rig_data,
+            session_data,
+            subject_data,
+        )
+        # Add plane metadata for each plane
+        for fov in ophys_fovs:
+            plane_metadata = OphysMetadata(
+                name=f'{fov["targeted_structure"]}_{fov["index"]}',
+                imaging_depth=str(fov["imaging_depth"]),
+                imaging_plane_group=str(fov["coupled_fov_index"]),
+                field_of_view_width=str(fov["fov_width"]),
+                field_of_view_height=str(fov["fov_height"]),
+            )
 
-        # Add the lab_metadata to the NWB file
-        nwb_file.add_lab_meta_data(plane_metadata)
-    logging.info(nwb_file)
+            # Add the lab_metadata to the NWB file
+            nwb_file.add_lab_meta_data(plane_metadata)
+        logging.info(nwb_file)
 
-    # write out
-    output_directory = Path(args.output_directory).absolute()
-    logging.info(f"Writing to {output_directory}")
-    io.write(nwb_file)
-    '''
+        # write out
+        output_directory = Path(args.output_directory).absolute()
+        logging.info(f"Writing to {output_directory}")
+        io.write(nwb_file)
