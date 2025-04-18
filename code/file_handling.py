@@ -26,7 +26,6 @@ MULTIPLANE_FILE_PARTS = {
 }
 
 
-
 def singleplane_session_data_files(input_path: Union[str, Path]):
     """Find all data files in a single-plane session directory.
 
@@ -66,8 +65,7 @@ def singleplane_session_data_files(input_path: Union[str, Path]):
     return data_files
 
 
-
-def multiplane_session_data_files(input_path: Union[str, Path], plane: str)
+def multiplane_session_data_files(input_path: Union[str, Path], plane: str):
     """Find all data files in a multiplane session directory.
 
     Parameters
