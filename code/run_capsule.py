@@ -1163,7 +1163,7 @@ def get_data_paths(input_directory: Path) -> Tuple[Path, Path, Path]:
 
 
 def get_processed_file_paths(
-    processed_path: Path, raw_path: Path, fovs: List
+    processed_path: Path, raw_path: Path, fovs: List, single_plane: bool
 ) -> dict:
     """Get the paths to the processed files,
        distinguishing between singleplane and multiplane.
@@ -1176,6 +1176,8 @@ def get_processed_file_paths(
         The path to the raw folder.
     fovs : List
         The list of fovs for processed data.
+    single_plane: bool
+        Whether the path is single-plane
 
     Returns
     -------
@@ -1185,7 +1187,7 @@ def get_processed_file_paths(
     file_paths = defaultdict(dict)
 
     # Determine if it's a singleplane session based on folder name
-    is_singleplane = "multiplane-ophys" not in processed_path.name
+    is_singleplane = single_plane
 
     if is_singleplane:
         # Singleplane case: processed_path itself contains the data
@@ -1202,17 +1204,12 @@ def get_processed_file_paths(
             processed_path, data_level="processed", fovs=fovs
         )
         for plane_path in processed_plane_paths:
-            plane_name = plane_path.name  # e.g., 'visp0', 'visp1'
-            file_paths["planes"][
-                plane_name
-            ] = file_handling.multiplane_session_data_files(plane_path)
-            file_paths["planes"][plane_name][
-                "processed_plane_path"
-            ] = plane_path
-
+            file_paths["planes"][plane_path] = file_handling.multiplane_session_data_files(
+                processed_path, plane_path
+            )
+        file_paths["planes"][plane_path]["processed_plane_path"] = plane_path
     file_paths["processed_path"] = processed_path
     file_paths["raw_path"] = raw_path
-
     return file_paths
 
 
@@ -1407,11 +1404,11 @@ if __name__ == "__main__":
     input_nwb_fp = input_nwb_paths[0]
 
     session_data, subject_data, rig_data = get_metadata(raw_data_fp)
-    ophys_fovs = session_data["data_streams"][1]["ophys_fovs"]
-    file_paths = get_processed_file_paths(
-        processed_data_fp, raw_data_fp, ophys_fovs
-    )
-
+    print(session_data['data_streams'])
+    try:
+        ophys_fovs = session_data["data_streams"][1]["ophys_fovs"]
+    except IndexError:
+        ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]        
     single_plane = False
     multiplane = False
     json_path = r"/data/raw/data_description.json"
@@ -1426,6 +1423,9 @@ if __name__ == "__main__":
         else:
             multiplane = True
 
+    file_paths = get_processed_file_paths(
+        processed_data_fp, raw_data_fp, ophys_fovs, single_plane
+    )
     current_time = datetime.now()
     formatted_date = current_time.strftime("%Y-%m-%d")
     formatted_time = current_time.strftime("%H-%M-%S")
@@ -1475,8 +1475,8 @@ if __name__ == "__main__":
         io.write(nwb_file)
 
     elif multiplane:
-        # sync_timestamps = get_sync_timestamps(raw_data_fp)
-        # ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
+        sync_timestamps = get_sync_timestamps(raw_data_fp)
+        ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
         nwbfile = nwb_ophys(
             nwb_file,
             file_paths,
