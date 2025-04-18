@@ -55,32 +55,6 @@ def load_pynwb_extension(schema, path):
     return pynwb.get_class(neurodata_type, "ndx-aibs-behavior-ophys")
 
 
-def grab_suffixes(directory):
-    """
-    Finds unique suffixes from CSV files and checks if
-    a corresponding TIFF file exists.
-
-    :param directory: Path to the directory containing .csv and .tif files.
-    :return: A set of valid suffixes that have both .csv and .tif files.
-    """
-    csv_suffixes = set()
-    tiff_suffixes = set()
-
-    # Iterate through files and collect suffixes
-    for filename in os.listdir(directory):
-        if filename.endswith(".csv"):
-            suffix = filename.split("_", 1)[0] + "_"
-            csv_suffixes.add(suffix)
-        elif filename.endswith(".tif"):
-            suffix = filename.split("_", 1)[0] + "_"
-            tiff_suffixes.add(suffix)
-
-    # Find suffixes that have both CSV and TIFF files
-    valid_suffixes = csv_suffixes & tiff_suffixes
-
-    return valid_suffixes
-
-
 def add_tiffs_to_nwb(directory, suffix, nwb_file):
     """
     Adds specific TIFF frames as an ImageSeries to an
