@@ -55,19 +55,23 @@ def load_pynwb_extension(schema, path):
     return pynwb.get_class(neurodata_type, "ndx-aibs-behavior-ophys")
 
 
-def add_tiffs_to_nwb(directory, suffix, nwb_file):
-    """
-    Adds specific TIFF frames as an ImageSeries to an
-      NWB file based on frame numbers in an associated CSV.
+def add_tiffs_to_nwb(directory: Union[str, Path], suffix: str, nwb_file: NWBFile):
+    """Add specific TIFF frames as an ImageSeries to an NWB file.
 
-    :param directory: Directory containing the TIFF and CSV files.
-    :param suffix: Suffix to match TIFF and CSV files.
-    :param nwb_file: The NWB file object to which the
-                     ImageSeries will be added.
-    :return: The updated NWB file.
-    """
+    Parameters
+    ----------
+    directory : str or Path
+        The directory containing the TIFF and CSV files.
+    suffix : str
+        The suffix used to match corresponding TIFF and CSV files.
+    nwb_file : NWBFile
+        The NWB file object to which the ImageSeries will be added.
 
-    print(f"Processing suffix: {suffix}")
+    Returns
+    -------
+    NWBFile
+        The updated NWB file with the added ImageSeries.
+    """
 
     # Get all .tif files matching the suffix
     tiff_files = sorted(
@@ -119,7 +123,7 @@ def add_tiffs_to_nwb(directory, suffix, nwb_file):
 
     # Read all images but only store the ones in 'valid_frames'
     for filename in tiff_files:
-        filepath = os.path.join(directory, filename)
+        filepath = Path(directory) / filename
         reader = imageio.get_reader(filepath)  # Open TIFF stack reader
 
         for frame_index, frame in enumerate(reader):
@@ -519,7 +523,6 @@ def nwb_ophys_single_plane(
             h5_group="traces",
             h5_key="roi",
         )
-        print(roi_traces, roi_names)
 
         # Create time series using frame rate
         roi_traces_series = RoiResponseSeries(

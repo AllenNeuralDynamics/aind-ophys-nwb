@@ -26,7 +26,8 @@ MULTIPLANE_FILE_PARTS = {
 }
 
 
-def singleplane_session_data_files(input_path):
+
+def singleplane_session_data_files(input_path: Union[str, Path]):
     """Find all data files in a single-plane session directory.
 
     Parameters
@@ -65,7 +66,8 @@ def singleplane_session_data_files(input_path):
     return data_files
 
 
-def multiplane_session_data_files(input_path, plane):
+
+def multiplane_session_data_files(input_path: Union[str, Path], plane: str)
     """Find all data files in a multiplane session directory.
 
     Parameters
@@ -225,7 +227,7 @@ def plane_paths_from_session(
             fov_pair = fov_plane + "_" + str(fov_index)
             planes.append(fov_pair)
     elif fovs == [] and data_level == "processed":
-        logger.error("Processed data requires ophys fovs")
+        raise ValueError("No Ophys fovs")
     if data_level == "raw":
         planes = [
             f for f in (session_path / "pophys").glob("*") if f.is_dir()
