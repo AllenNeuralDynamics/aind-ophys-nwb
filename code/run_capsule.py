@@ -34,6 +34,7 @@ from pynwb.ophys import (
     RoiResponseSeries,
 )
 from pynwb.epoch import TimeIntervals
+from pynwb import NWBFile
 
 
 class SegmentationApproach(Enum):
@@ -55,7 +56,9 @@ def load_pynwb_extension(schema, path):
     return pynwb.get_class(neurodata_type, "ndx-aibs-behavior-ophys")
 
 
-def add_tiffs_to_nwb(directory: Union[str, Path], suffix: str, nwb_file: NWBFile):
+def add_tiffs_to_nwb(
+    directory: Union[str, Path], suffix: str, nwb_file: NWBFile
+):
     """Add specific TIFF frames as an ImageSeries to an NWB file.
 
     Parameters
