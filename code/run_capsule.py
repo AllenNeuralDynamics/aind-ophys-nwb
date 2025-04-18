@@ -34,7 +34,6 @@ from pynwb.ophys import (
     RoiResponseSeries,
 )
 from pynwb.epoch import TimeIntervals
-from schemas import OphysMetadata
 
 
 class SegmentationApproach(Enum):
@@ -1201,10 +1200,15 @@ def get_processed_file_paths(
     else:
         # Multiplane case: Extract plane folders
         processed_plane_paths = file_handling.plane_paths_from_session(
-            processed_path, data_level="processed", fovs=fovs
+            processed_path,
+            data_level="processed",
+            fovs=fovs,
+            single_plane=False,
         )
         for plane_path in processed_plane_paths:
-            file_paths["planes"][plane_path] = file_handling.multiplane_session_data_files(
+            file_paths["planes"][
+                plane_path
+            ] = file_handling.multiplane_session_data_files(
                 processed_path, plane_path
             )
         file_paths["planes"][plane_path]["processed_plane_path"] = plane_path
@@ -1263,7 +1267,6 @@ def _sync_timestamps(sync_fp: Path) -> np.array:
         The sync timestamps
     """
     sync_dataset = sync.load_sync(sync_fp)
-    print(sync_dataset)
     return sync.get_edges(
         sync_file=sync_dataset,
         kind="rising",
@@ -1301,7 +1304,6 @@ def get_sync_timestamps(raw_path: Path) -> np.array:
         raise FileNotFoundError(
             "Sync file not found in behavior, *ophys, or single-plane folder"
         )
-
     return _sync_timestamps(sync_fp)
 
 
@@ -1404,11 +1406,10 @@ if __name__ == "__main__":
     input_nwb_fp = input_nwb_paths[0]
 
     session_data, subject_data, rig_data = get_metadata(raw_data_fp)
-    print(session_data['data_streams'])
     try:
         ophys_fovs = session_data["data_streams"][1]["ophys_fovs"]
     except IndexError:
-        ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]        
+        ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]
     single_plane = False
     multiplane = False
     json_path = r"/data/raw/data_description.json"
@@ -1476,7 +1477,9 @@ if __name__ == "__main__":
 
     elif multiplane:
         sync_timestamps = get_sync_timestamps(raw_data_fp)
-        ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
+        ophys_fovs = sync_times_to_multiplane_fovs(
+            ophys_fovs, sync_timestamps
+        )
         nwbfile = nwb_ophys(
             nwb_file,
             file_paths,
@@ -1486,6 +1489,7 @@ if __name__ == "__main__":
             subject_data,
         )
         # Add plane metadata for each plane
+        OphysMetadata = load_pynwb_extension("", name_space)
         for fov in ophys_fovs:
             plane_metadata = OphysMetadata(
                 name=f'{fov["targeted_structure"]}_{fov["index"]}',

@@ -1,6 +1,7 @@
-## copied from comb
+# copied from comb
 
 import json
+
 # set up logger
 import logging
 import warnings
@@ -9,24 +10,6 @@ from typing import Dict, List, Union
 
 logger = logging.getLogger(__name__)
 
-
-# MULTIPLANE_FILE_PARTS = {"processing_json": "processing.json",
-#                            "params_json": "_params.json",
-#                            "registered_metrics_json": "_registered_metrics.json",
-#                            "average_projection_png": "_average_projection.png",
-#                            "max_projection_png": "_maximum_projection.png",
-#                            "motion_transform_csv": "_motion_transform.csv",
-#                            "segmentation_output_json": "segmentation_output.json",
-#                            "roi_traces_h5": "roi_traces.h5",
-#                            "neuropil_traces_h5": "neuropil_traces.h5",
-#                            "neuropil_correction_h5": "neuropil_correction.h5",
-#                            "neuropil_masks_json": "neuropil_masks.json",
-#                            "neuropil_trace_output_json": "neuropil_trace_output.json",
-#                            #"demixing_h5": "demixing_output.h5",
-#                            #"demixing_json": "demixing_output.json",
-#                            "dff_h5": "dff.h5",
-#                            "extract_traces_json": "extract_traces.json",
-#                            "events_oasis_h5": "events_oasis.h5"}
 
 MULTIPLANE_FILE_PARTS = {
     "processing_json": "processing.json",
@@ -41,6 +24,7 @@ MULTIPLANE_FILE_PARTS = {
     "events_oasis_h5": "events_oasis.h5",
     "classifier_h5": "classification.h5",
 }
+
 
 def singleplane_session_data_files(input_path):
     """Find all data files in a single-plane session directory.
@@ -57,22 +41,29 @@ def singleplane_session_data_files(input_path):
     """
     input_path = Path(input_path)
 
-    # There should be exactly one subfolder inside the single-plane parent folder
+    # There should be exactly one subfolder inside
+    # the single-plane parent folder
     subfolders = [f for f in input_path.iterdir() if f.is_dir()]
     if len(subfolders) == 1:
         singleplane_data_path = subfolders[0]
     if len(subfolders) == 0:
         singleplane_data_path = input_path
     if len(subfolders) != 1 and len(subfolders) != 0:
-        raise ValueError(f"Expected exactly one or zero subfolder in {input_path}, found {len(subfolders)}")
+        raise ValueError(
+            f"Expected exactly one or zero subfolder in {input_path},  \
+              found {len(subfolders)}"
+        )
 
-  # This is the actual data directory
+    # This is the actual data directory
 
     data_files = {}
     for key, value in MULTIPLANE_FILE_PARTS.items():
-        data_files[key] = find_data_file(singleplane_data_path, value)  # Search in the subfolder
+        data_files[key] = find_data_file(
+            singleplane_data_path, value
+        )  # Search in the subfolder
 
     return data_files
+
 
 def multiplane_session_data_files(input_path, plane):
     """Find all data files in a multiplane session directory.
@@ -99,13 +90,6 @@ def multiplane_session_data_files(input_path, plane):
 def find_data_file(input_path, file_part, verbose=False):
     """Find a file in a directory given a partial file name.
 
-    Example
-    -------
-    input_path = /root/capsule/data/multiplane-ophys_724567_2024-05-20_12-00-21
-    file_part = "_sync.h5"
-    return: "/root/capsule/data/multiplane-ophys_724567_2024-05-20_12-00-21/ophys/1367710111_sync.h5"
-
-
     Parameters
     ----------
     input_path : str or Path
@@ -118,7 +102,9 @@ def find_data_file(input_path, file_part, verbose=False):
         file = list(input_path.glob(f"**/*{file_part}*"))[0]
     except IndexError:
         if verbose:
-            logger.warning(f"File with '{file_part}' not found in {input_path}")
+            logger.warning(
+                f"File with '{file_part}' not found in {input_path}"
+            )
         file = None
     return file
 
@@ -163,17 +149,25 @@ def get_sync_file_path(input_path, verbose=False):
     try:
         # method 1: find sync_file by name
         file_parts = {"sync_h5": "_sync.h5"}
-        sync_file_path = find_data_file(input_path, file_parts["sync_h5"], verbose=False)
-    except IndexError as e:
+        sync_file_path = find_data_file(
+            input_path, file_parts["sync_h5"], verbose=False
+        )
+    except IndexError:
         if verbose:
-            logger.info("file with '*_sync.h5' not found, trying platform json")
+            logger.info(
+                "file with '*_sync.h5' not found, trying platform json"
+            )
 
     if sync_file_path is None:
         # method 2: load platform json
         # Note: sometimes fails if platform json has incorrect sync_file path
-        logging.info(f"Trying to find sync file using platform json for {input_path}")
+        logging.info(
+            f"Trying to find sync file using platform json for {input_path}"
+        )
         file_parts = {"platform_json": "_platform.json"}
-        platform_path = find_data_file(input_path, file_parts["platform_json"])
+        platform_path = find_data_file(
+            input_path, file_parts["platform_json"]
+        )
         with open(platform_path, "r") as f:
             platform_json = json.load(f)
         ophys_folder = check_ophys_folder(input_path)
@@ -181,7 +175,8 @@ def get_sync_file_path(input_path, verbose=False):
 
         if not sync_file_path.exists():
             logger.error(
-                f"Unsupported data asset structure, sync file not found in {sync_file_path}"
+                f"Unsupported data asset structure, \
+                    sync file not found in {sync_file_path}"
             )
             sync_file_path = None
         else:
@@ -191,9 +186,13 @@ def get_sync_file_path(input_path, verbose=False):
 
 
 def plane_paths_from_session(
-    session_path: Union[Path, str], data_level: str = "raw", fovs: List = []
+    session_path: Union[Path, str],
+    data_level: str = "raw",
+    fovs: List = [],
+    single_plane: bool = False,
 ) -> list:
-    """Get plane paths from a session directory, supporting both singleplane and multiplane cases.
+    """Get plane paths from a session directory,
+        supporting both singleplane and multiplane cases.
 
     Parameters
     ----------
@@ -203,30 +202,41 @@ def plane_paths_from_session(
         Data level, by default "raw". Options: "raw", "processed"
     fovs: List, optional
         List of ophys fovs. Should be provided for all processed assets
+    single_plane: bool, optional
+        Bool indicating whether the sess is single_plane
 
     Returns
     -------
     list
         List of plane paths
     """
-    session_path = Path(session_path) if isinstance(session_path, str) else session_path
+    session_path = (
+        Path(session_path) if isinstance(session_path, str) else session_path
+    )
 
-    if data_level == "processed":
-        if not fovs:
-            logger.error("Processed data requires ophys fovs")
-            return []
-        return [session_path / f"{fov['targeted_structure']}_{fov['index']}" for fov in fovs]
+    if single_plane:
+        return [session_path]  # Singleplane session (no subdirectories)
 
-    # For raw data, check if the session contains plane subdirectories or is a singleplane session
-    possible_planes = list((session_path / "pophys").glob("*")) if (session_path / "pophys").exists() else []
-    
-    if possible_planes and all(p.is_dir() for p in possible_planes):
-        return possible_planes  # Multiplane session (folders exist)
-    return [session_path]  # Singleplane session (no subdirectories)
+    if fovs != [] and data_level == "processed":
+        planes = []
+        for fov in fovs:
+            fov_plane = fov["targeted_structure"]
+            fov_index = fov["index"]
+            fov_pair = fov_plane + "_" + str(fov_index)
+            planes.append(fov_pair)
+    elif fovs == [] and data_level == "processed":
+        logger.error("Processed data requires ophys fovs")
+    if data_level == "raw":
+        planes = [
+            f for f in (session_path / "pophys").glob("*") if f.is_dir()
+        ]
+    return planes
+
 
 def get_ophys_processed_file_paths(processed_path: Union[Path, str]) -> dict:
     """
-    Create a dictionary of file paths for a processed ophys session, supporting both singleplane and multiplane.
+    Create a dictionary of file paths for a processed ophys session,
+        supporting both singleplane and multiplane.
 
     Parameters
     ----------
@@ -236,25 +246,31 @@ def get_ophys_processed_file_paths(processed_path: Union[Path, str]) -> dict:
     Returns
     -------
     dict
-        A dictionary containing file paths for each plane (or the session folder in singleplane).
+        A dictionary containing file paths for each plane
+            (or the session folder in singleplane).
     """
     processed_path = Path(processed_path)
 
-    processed_plane_paths = plane_paths_from_session(processed_path, data_level="processed")
+    processed_plane_paths = plane_paths_from_session(
+        processed_path, data_level="processed"
+    )
 
     file_paths = {"planes": {}, "processed_path": processed_path}
 
     for plane_path in processed_plane_paths:
         plane_path = Path(plane_path)
         plane = plane_path.name
-        file_paths["planes"][plane] = multiplane_session_data_files(plane_path)  # Replace with singleplane logic if needed
+        file_paths["planes"][plane] = multiplane_session_data_files(
+            plane_path
+        )  # Replace with singleplane logic if needed
         file_paths["planes"][plane]["processed_plane_path"] = plane_path
 
     return file_paths
 
-####################################################################################################
+
+##################################################
 # METADATA EXTRACTION
-####################################################################################################
+##################################################
 
 
 def extract_laser_metadata(session_json: dict):
@@ -271,7 +287,9 @@ def extract_laser_metadata(session_json: dict):
     """
     ophys_stream = extract_ophys_stream(session_json)
     light_sources = ophys_stream.get("light_sources", [])
-    laser_stream = next((ls for ls in light_sources if ls.get("name") == "Laser"), None)
+    laser_stream = next(
+        (ls for ls in light_sources if ls.get("name") == "Laser"), None
+    )
     if laser_stream is None:
         raise ValueError("No Laser device found in data streams")
     return {
@@ -358,12 +376,15 @@ def gcamp_from_genotype(genotype: str):
     """
 
     genotype_parts = genotype.split("-")
-    gcamp_part = next((part for part in genotype_parts if "gcamp" in part.lower()), None)
+    gcamp_part = next(
+        (part for part in genotype_parts if "gcamp" in part.lower()), None
+    )
 
     # Check for wildtype genotype
     if genotype.lower() in ["wt/wt", "wt/wt "]:
         warnings.warn(
-            "Wildtype genotype detected. " "Viral injection for GCaMP not implemented.",
+            "Wildtype genotype detected. "
+            "Viral injection for GCaMP not implemented.",
             UserWarning,
         )
         return None
@@ -371,7 +392,9 @@ def gcamp_from_genotype(genotype: str):
     if gcamp_part:
         return gcamp_part
     else:
-        return None  # or you could return a default value or raise an exception
+        return (
+            None  # or you could return a default value or raise an exception
+        )
 
 
 def metadata_for_multiplane(data_path: Union[str, Path]) -> dict:
@@ -392,7 +415,6 @@ def metadata_for_multiplane(data_path: Union[str, Path]) -> dict:
 
     jsons = load_metadata_json_files(data_path)
 
-    ### SESSION METADATA ###
     md["session_start_time"] = jsons["session"].get("session_start_time")
     md["experimenter"] = jsons["session"].get("experimenter_full_name")
     md["session_type"] = jsons["session"].get("session_type")
@@ -407,7 +429,6 @@ def metadata_for_multiplane(data_path: Union[str, Path]) -> dict:
         )
     )
 
-    ### SESSION SUMMARY METADATA ###
     md["session_num_planes"] = len(md["ophys_fovs"].keys())
 
     imaging_depths = []
@@ -420,7 +441,6 @@ def metadata_for_multiplane(data_path: Union[str, Path]) -> dict:
     # This should be a natural text summary of the task
     md["session_task_description"] = "Visual change detection task."
 
-    ### RIG METADATA ###
     # could get from rig, but also in session.json
     md["microscope_name"] = jsons["session"].get("rig_id")
     if md["microscope_name"] in ["MESO.1", "MESO.2"]:
@@ -428,7 +448,6 @@ def metadata_for_multiplane(data_path: Union[str, Path]) -> dict:
     else:
         md["microscope_description"] = "Unknown"
 
-    ### SUBJECT METADATA ###
     md["subject_id"] = jsons["subject"].get("subject_id")
     md["genotype"] = jsons["subject"].get("genotype")
     md["sex"] = jsons["subject"].get("sex")
@@ -445,7 +464,8 @@ def load_metadata_json_files(
     processed_path: Union[str, Path]
 ) -> Dict[str, Union[dict, None]]:
     """
-    Load procedures.json, session.json, subject.json, and rig.json into a dictionary.
+    Load procedures.json, session.json, subject.json,
+        and rig.json into a dictionary.
 
     Parameters
     ----------
@@ -459,7 +479,12 @@ def load_metadata_json_files(
         If a file is not found, its value will be None.
     """
     processed_path = Path(processed_path)
-    json_files = ["procedures.json", "session.json", "subject.json", "rig.json"]
+    json_files = [
+        "procedures.json",
+        "session.json",
+        "subject.json",
+        "rig.json",
+    ]
     result = {}
 
     for file_name in json_files:
@@ -470,7 +495,8 @@ def load_metadata_json_files(
                     result[file_name.replace(".json", "")] = json.load(f)
             except json.JSONDecodeError:
                 print(
-                    f"Error decoding {file_name}. File may be empty or contain invalid JSON."
+                    f"Error decoding {file_name}. \
+                        File may be empty or contain invalid JSON."
                 )
                 result[file_name.replace(".json", "")] = {}
         else:
