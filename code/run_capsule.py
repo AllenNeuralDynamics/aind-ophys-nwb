@@ -304,6 +304,7 @@ def nwb_ophys_single_plane(
     rig_json_data: dict,
     session_json_data: dict,
     subject_json_data: dict,
+    procedures_json_data: dict,
     frame_rate: float,
 ) -> Tuple[pynwb.NWBFile, dict]:
     """Create an NWB file for single-plane ophys data
@@ -320,6 +321,8 @@ def nwb_ophys_single_plane(
     session_json_data : dict
         The session metadata
     subject_json_data : dict
+        The subject metadata
+    procedures_json_data : dict
         The subject metadata
     frame_rate : float
         The frame rate in Hz (frames per second)
@@ -338,33 +341,42 @@ def nwb_ophys_single_plane(
     # Get the single plane name from file_paths
     plane_name = list(file_paths["planes"].keys())[0]
     logging.info(f"Processing single plane: {plane_name}")
+    structure = str(session_json_data['data_streams'][1]['ophys_fovs'][0]['targeted_structure'])
+    imaging_depth = str(session_json_data['data_streams'][1]['ophys_fovs'][0]['imaging_depth'])
+    step_unit = str(session_json_data['data_streams'][1]['ophys_fovs'][0]['fov_scale_factor_unit'])
+    imaging_depth_unit = str(session_json_data['data_streams'][1]['ophys_fovs'][0]['imaging_depth_unit'])
 
     # Create imaging plane with appropriate metadata
     location = (
-        "Structure: " + "Unknown Structure" + " Depth: " + str(0)
+        "Structure: " + structure + " Depth: " + imaging_depth
     )  # Update if available in metadata
 
     ophys_module = nwbfile.create_processing_module(
         name=plane_name, description="Single-plane ophys processing module"
     )
+    injection = ""
+    for proc in procedures_json_data['subject_procedures'][0]['procedures']:
+        if 'injection_materials' in proc:
+            injection = (proc['injection_materials'][0]['name'])
 
     imaging_plane = nwbfile.create_imaging_plane(
         name=plane_name,
         optical_channel=optical_channel,
         imaging_rate=frame_rate,
-        description="Single-photon imaging plane",
+        description="2-photon imaging plane",
         device=device,
         excitation_lambda=float(
             session_json_data["data_streams"][0]["light_sources"][0][
                 "wavelength"
             ]
         ),
-        indicator=subject_json_data["genotype"],
+        indicator=injection,
         location=location,
+        unit = "",
         grid_spacing=[1.0, 1.0],  # Update if available
-        grid_spacing_unit="meters",
+        grid_spacing_unit=step_unit,
         origin_coords=[0.0, 0.0, 0.0],
-        origin_coords_unit="meters",
+        origin_coords_unit=imaging_depth_unit,
     )
 
     # Add ImageSegmentation
@@ -1225,6 +1237,12 @@ def get_metadata(raw_path: Path) -> Tuple[dict, dict, dict]:
             f"Subject JSON file not found in the raw folder,\
               {subject_json_path}"
         )
+    procedures_json_path = raw_path / "procedures.json"
+    if not procedures_json_path.is_file():
+        raise FileNotFoundError(
+            f"Subject JSON file not found in the raw folder,\
+              {subject_json_path}"
+        )
 
     with open(rig_json_path) as f:
         rig_json_data = json.load(f)
@@ -1232,7 +1250,9 @@ def get_metadata(raw_path: Path) -> Tuple[dict, dict, dict]:
         session_json_data = json.load(f)
     with open(subject_json_path) as f:
         subject_json_data = json.load(f)
-    return session_json_data, subject_json_data, rig_json_data
+    with open(procedures_json_path) as f:
+        procedures_json_data = json.load(f)
+    return session_json_data, subject_json_data, rig_json_data, procedures_json_data
 
 
 def _sync_timestamps(sync_fp: Path) -> np.array:
@@ -1385,7 +1405,7 @@ if __name__ == "__main__":
     input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
     input_nwb_fp = input_nwb_paths[0]
 
-    session_data, subject_data, rig_data = get_metadata(raw_data_fp)
+    session_data, subject_data, rig_data, procedures_data = get_metadata(raw_data_fp)
     try:
         ophys_fovs = session_data["data_streams"][1]["ophys_fovs"]
     except IndexError:
@@ -1451,6 +1471,7 @@ if __name__ == "__main__":
             rig_data,
             session_data,
             subject_data,
+            procedures_data,
             frame_rate,
         )
         io.write(nwb_file)
