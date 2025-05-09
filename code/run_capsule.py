@@ -240,6 +240,14 @@ def load_sparse_array(h5_file):
     return pixelmasks
 
 
+def convert_rois_to_segmentation_mask(h5_file):
+    pixelmasks = load_sparse_array(h5_file)
+    segmentation_mask = np.zeros(pixelmasks.shape[1:], dtype="i2")
+    contains_roi = pixelmasks.sum(0) > 0
+    segmentation_mask[contains_roi] = np.argmax(pixelmasks[:, contains_roi], 0) + 1
+    return segmentation_mask
+
+
 def get_segementation_approach(extraction_h5: Path) -> SegmentationApproach:
     """Get the segmentation approach from the extraction file
 
@@ -801,16 +809,18 @@ def nwb_ophys(
             description="Max intensity projection of entire session",
         )
         if segmentation_approach == SegmentationApproach.SUITE2P_ANATOMICAL:
-            segmetation_mask = load_generic_group(
+            segmentation_mask = load_generic_group(
                 file_paths["planes"][plane_name]["extraction_h5"],
                 h5_group="cellpose",
                 h5_key="masks",
             )
         else:
-            raise NotImplementedError("Cannot process functional segmentation")
+            segmentation_mask = convert_rois_to_segmentation_mask(
+                file_paths["planes"][plane_name]["extraction_h5"]
+            )
         mask_img = GrayscaleImage(
             name="segmentation_mask_image",
-            data=segmetation_mask,
+            data=segmentation_mask,
             resolution=float(plane["fov_scale_factor"]),  # pixels/cm
             description="Segmentation projection of entire session",
         )
