@@ -977,7 +977,7 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
         key=lambda x: x.stat().st_mtime,
         reverse=True,
     )
-        return processed_folders[0]  # Latest processed singleplane folder
+    return processed_folders[0]  # Latest processed singleplane folder
 
 
 def find_latest_raw_folder(input_directory: Path) -> Path:
