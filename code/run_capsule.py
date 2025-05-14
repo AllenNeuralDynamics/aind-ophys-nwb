@@ -968,41 +968,16 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
     Path
         The path to the latest processed asset.
     """
-    input_directory = Path(input_directory)
-
-    # Look for folders with "multiplane-ophys" and "processed"
-    multiplane_folders = sorted(
-        [
-            folder
-            for folder in input_directory.glob("*")
-            if folder.is_dir()
-            and "multiplane-ophys" in folder.name
-            and "processed" in folder.name
-        ],
-        key=lambda x: x.stat().st_mtime,
-        reverse=True,
-    )
-
-    if multiplane_folders:
-        return multiplane_folders[0]
-
-    # Look for a general "processed" folder (singleplane case)
     processed_folders = sorted(
         [
             folder
-            for folder in input_directory.glob("*")
+            for folder in input_directory.glob("*processed/*")
             if folder.is_dir() and "processed" in folder.name
         ],
         key=lambda x: x.stat().st_mtime,
         reverse=True,
     )
-
-    if processed_folders:
         return processed_folders[0]  # Latest processed singleplane folder
-
-    raise FileNotFoundError(
-        "No matching processed folder found in the input directory."
-    )
 
 
 def find_latest_raw_folder(input_directory: Path) -> Path:
@@ -1020,30 +995,12 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
     Path
         The path to the latest raw asset.
     """
-    input_directory = Path(input_directory)
-
-    # Look for folders with "multiplane-ophys" but NOT "processed"
-    multiplane_folders = sorted(
-        [
-            folder
-            for folder in input_directory.glob("*")
-            if folder.is_dir()
-            and "multiplane-ophys" in folder.name
-            and "processed" not in folder.name
-        ],
-        key=lambda x: x.stat().st_mtime,
-        reverse=True,
-    )
-
-    if multiplane_folders:
-        return multiplane_folders[0]  # Latest raw multiplane folder
-
     # Look for general raw folders (singleplane case)
     raw_folders = sorted(
         [
             folder
-            for folder in input_directory.glob("*")
-            if folder.is_dir() and "raw" in folder.name
+            for folder in input_directory.glob("*raw/*")
+            if folder.is_dir()
         ],
         key=lambda x: x.stat().st_mtime,
         reverse=True,
@@ -1135,32 +1092,6 @@ def sync_times_to_multiplane_fovs(
                 plane_group::image_groups
             ]
     return ophys_fovs
-
-
-def get_data_paths(input_directory: Path) -> Tuple[Path, Path, Path]:
-    """Get the paths to the input NWB file and the processed and raw folders
-
-    Parameters
-    ----------
-    input_directory : Path
-        The directory containing the NWB file and the processed and raw folders
-
-    Returns
-    -------
-    Tuple[Path, Path, Path]
-        The paths to the input NWB file, the processed folder,
-        and the raw folder
-    """
-    input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
-    if len(input_nwb_paths) != 1:
-        raise AssertionError(
-            "One valid NWB file must be present in the input directory"
-        )
-    input_nwb_path = input_nwb_paths[0]
-    processed_path = find_latest_processed_folder(args.input_directory)
-    raw_path = find_latest_raw_folder(args.input_directory)
-
-    return input_nwb_path, processed_path, raw_path
 
 
 def get_processed_file_paths(
@@ -1411,23 +1342,10 @@ if __name__ == "__main__":
     args = parse_args()
     input_directory = Path(args.input_directory)
     output_directory = Path(args.output_directory)
-
-    input_nwb_fp, processed_data_fp, raw_data_fp = get_data_paths(
-        input_directory
-    )
-    input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
-    input_nwb_fp = input_nwb_paths[0]
-
-    session_data, subject_data, rig_data, procedures_data = get_metadata(
-        raw_data_fp
-    )
-    try:
-        ophys_fovs = session_data["data_streams"][1]["ophys_fovs"]
-    except IndexError:
-        ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]
+    
     single_plane = False
     multiplane = False
-    json_path = r"/data/raw/data_description.json"
+    json_path = next(input_directory.rglob("data_description.json"))
     with open(json_path, "r") as f:
         data_description = json.load(f)
 
@@ -1438,6 +1356,26 @@ if __name__ == "__main__":
             single_plane = True
         else:
             multiplane = True
+
+    input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
+    if len(input_nwb_paths) != 1:
+        raise AssertionError(
+            "One valid NWB file must be present in the input directory"
+        )
+    input_nwb_path = input_nwb_paths[0]
+    processed_path = find_latest_processed_folder(input_directory)
+    raw_path = find_latest_raw_folder(input_directory)
+    input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
+    input_nwb_fp = input_nwb_paths[0]
+
+    session_data, subject_data, rig_data, procedures_data = get_metadata(
+        raw_data_fp
+    )
+    try:
+        ophys_fovs = session_data["data_streams"][1]["ophys_fovs"]
+    except IndexError:
+        ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]
+    
 
     file_paths = get_processed_file_paths(
         processed_data_fp, raw_data_fp, ophys_fovs, single_plane
