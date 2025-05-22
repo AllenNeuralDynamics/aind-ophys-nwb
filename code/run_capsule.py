@@ -926,12 +926,12 @@ def find_latest_processed_folder(input_directory: Path) -> Path:
     processed_folders = sorted(
         [
             folder
-            for folder in input_directory.glob("*processed/*")
-            if folder.is_dir() and "processed" in folder.name
-        ],
+            for folder in input_directory.rglob("processed/*")
+            if folder.is_dir()],
         key=lambda x: x.stat().st_mtime,
         reverse=True,
     )
+    import pdb;pdb.set_trace()
     return processed_folders[0]  # Latest processed singleplane folder
 
 
@@ -1300,11 +1300,12 @@ if __name__ == "__main__":
     if len(input_nwb_paths) != 1:
         raise AssertionError("One valid NWB file must be present in the input directory")
     input_nwb_path = input_nwb_paths[0]
-    processed_path = find_latest_processed_folder(input_directory)
-    raw_path = find_latest_raw_folder(input_directory)
+    # processed_data_fp = find_latest_processed_folder(input_directory)
+    # raw_data_fp = find_latest_raw_folder(input_directory)
     input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
     input_nwb_fp = input_nwb_paths[0]
-
+    raw_data_fp = input_directory / 'raw'
+    processed_data_fp = input_directory / 'processed'
     session_data, subject_data, rig_data, procedures_data = get_metadata(raw_data_fp)
     try:
         ophys_fovs = session_data["data_streams"][1]["ophys_fovs"]
