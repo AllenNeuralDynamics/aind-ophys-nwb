@@ -26,7 +26,7 @@ XXX
 
 ## Data Structure
 
-The library expects NWB files to be organized in a specific directory structure under `/data/` with folders containing "nwb" in their names, and files containing "multiplane" in their filenames.
+The library expects NWB files to be organized in a specific directory structure under `/data/` with folders containing "nwb" in their names. Raw data are expected to be mounted to a folder named `/raw`, the NWB schema must be mounted to `/schemas` and all processed data must be mounted to `/processed`.
 
 ## CodeOcean Integration
 
