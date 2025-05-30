@@ -1293,9 +1293,10 @@ if __name__ == "__main__":
             == "single-plane-ophys"
         ):
             single_plane = True
+            print(f"~~~~~~~~~~~~~Running in mode SINGLE PLANE")
         else:
             multiplane = True
-
+    
     input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
     if len(input_nwb_paths) != 1:
         raise AssertionError("One valid NWB file must be present in the input directory")
@@ -1315,6 +1316,9 @@ if __name__ == "__main__":
     file_paths = get_processed_file_paths(
         processed_data_fp, raw_data_fp, ophys_fovs, single_plane
     )
+    from pprint import pprint
+    print("FILE PATHS")
+    pprint(file_paths)
     current_time = datetime.now()
     formatted_date = current_time.strftime("%Y-%m-%d")
     formatted_time = current_time.strftime("%H-%M-%S")
