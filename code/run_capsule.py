@@ -35,7 +35,8 @@ from pynwb.ophys import (
 )
 from pynwb.epoch import TimeIntervals
 from pynwb import NWBFile
-
+from nwbwidgets import nwb2widget
+from nwbwidgets.view import default_neurodata_vis_spec
 
 class SegmentationApproach(Enum):
     SUITE2P_ANATOMICAL = {
