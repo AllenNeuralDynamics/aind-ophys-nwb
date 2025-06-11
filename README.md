@@ -21,7 +21,7 @@ Example Notebooks
 
 The repository includes example notebooks demonstrating typical workflows:
 
-XXX 
+/code/nwb_visualization_notebook.ipynb
 
 
 ## Data Structure
