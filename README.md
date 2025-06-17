@@ -21,7 +21,9 @@ Example Notebooks
 
 The repository includes example notebooks demonstrating typical workflows:
 
-/code/nwb_visualization_notebook.ipynb
+URL: https://github.com/AllenNeuralDynamics/aind-ophys-nwb/code/nwb_visualization_notebook.ipynb
+
+File Path: /code/nwb_visualization_notebook.ipynb
 
 
 ## Data Structure
