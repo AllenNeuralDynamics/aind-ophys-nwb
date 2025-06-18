@@ -19,15 +19,15 @@ In Code Ocean, the required input are:
 
 ## Examining NWB Content 
 
-Once loaded, you can examine the NWB file structure and content using standard pynwb methods.
+Provided is an [example notebook](https://github.com/AllenNeuralDynamics/aind-ophys-nwb/code/nwb_visualization_notebook.ipynb) examining the contents of the NWB.
 
-Example Notebooks
+Briefly, the contents output in the NWB include: 
 
-The repository includes example notebooks demonstrating typical workflows:
+1) Processing container with the cell table for each plane. The cell table includes, extraction traces, dF / F, segmentation and cell classification.
 
-URL: https://github.com/AllenNeuralDynamics/aind-ophys-nwb/code/nwb_visualization_notebook.ipynb
+2) Subject container with the subject data.
 
-File Path: /code/nwb_visualization_notebook.ipynb
+3) Device container with the microscope information
 
 
 ## CodeOcean Integration
