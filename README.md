@@ -4,13 +4,17 @@ A Python-based tool for working with ophys data in the Neurodata Without Borders
 
 ## Overview
 
-This repository contains utilities for working with ophys (optical physiology) data stored in the NWB format. It allows users to load, examine, and process NWB files that contain multiplane ophys recordings. It is meant to be used in a Code Ocean workstation where processed ophys assets can be attached to the capsule and a reproducible run will produce a complete, ophys NWB.
+This repository extracts processed data from single plane and multiplane optical physiology datasets and packages the data into NWB format.It is meant to be used in a Code Ocean workstation where processed ophys assets can be attached to the capsule and a reproducible run will produce a complete, ophys NWB.  It also containes notebooks which allow users to load, examine, and process NWB files that contain multiplane ophys recordings.
 
 ## Usage
 
 Loading NWB Files
-
-The library provides functions to load NWB files from data directories:
+The library provides functions to load NWB files from data directories.
+In Code Ocean, the required input are:
+1. NWB files to be organized in a specific directory structure under `/data/` with folders containing "nwb" in their names.
+2. Raw data are expected to be mounted to a folder named `/raw`
+3. NWB schema must be mounted to `/schemas`
+4. All processed data must be mounted to `/processed`.
 
 
 ## Examining NWB Content 
@@ -25,10 +29,6 @@ URL: https://github.com/AllenNeuralDynamics/aind-ophys-nwb/code/nwb_visualizatio
 
 File Path: /code/nwb_visualization_notebook.ipynb
 
-
-## Data Structure
-
-The library expects NWB files to be organized in a specific directory structure under `/data/` with folders containing "nwb" in their names. Raw data are expected to be mounted to a folder named `/raw`, the NWB schema must be mounted to `/schemas` and all processed data must be mounted to `/processed`.
 
 ## CodeOcean Integration
 
