@@ -19,7 +19,7 @@ In Code Ocean, the required input are:
 
 ## Examining NWB Content 
 
-Provided is an [example notebook]([https://github.com/AllenNeuralDynamics/aind-ophys-nwb/examples/nwb_visualization_notebook.ipynb](https://github.com/AllenNeuralDynamics/aind-ophys-nwb/blob/main/examples/nwb_visualization_notebook.ipynb)) examining the contents of the NWB.
+Provided is an [example notebook](https://github.com/AllenNeuralDynamics/aind-ophys-nwb/blob/main/examples/nwb_visualization_notebook.ipynb) examining the contents of the NWB.
 
 Briefly, the contents output in the NWB include: 
 
