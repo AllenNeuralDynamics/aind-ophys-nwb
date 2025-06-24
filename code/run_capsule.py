@@ -1124,8 +1124,8 @@ def get_metadata(raw_path: Path) -> Tuple[dict, dict, dict]:
     procedures_json_path = raw_path / "procedures.json"
     if not procedures_json_path.is_file():
         raise FileNotFoundError(
-            f"Subject JSON file not found in the raw folder,\
-              {subject_json_path}"
+            f"Procedures JSON file not found in the raw folder,\
+              {procedures_json_path}"
         )
 
     with open(rig_json_path) as f:
