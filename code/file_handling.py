@@ -43,6 +43,7 @@ def singleplane_session_data_files(input_path: Union[str, Path]):
 
     # There should be exactly one subfolder inside
     # the single-plane parent folder
+    img_path = ""
     subfolders = [f for f in input_path.iterdir() if f.is_dir()]
     if len(subfolders) == 1:
         singleplane_data_path = subfolders[0]
@@ -52,6 +53,10 @@ def singleplane_session_data_files(input_path: Union[str, Path]):
     for subfolder in subfolders:
         if "capsule" in subfolder.name:
             singleplane_data_path = subfolder
+        # newer assets have the motion_correcton in its own folder
+        if "MOp2_3_0" in subfolder.name:
+            img_path = subfolder / "motion_correction"
+        
 
     # This is the actual data directory
 
@@ -59,6 +64,14 @@ def singleplane_session_data_files(input_path: Union[str, Path]):
     for key, value in MULTIPLANE_FILE_PARTS.items():
         data_files[key] = find_data_file(
             singleplane_data_path, value
+        )  # Search in the subfolder
+
+    if img_path != "":
+        data_files['max_projection_png'] = find_data_file(
+            img_path, "maximum_projection.png"
+        )  # Search in the subfolder
+        data_files['average_projection_png'] = find_data_file(
+            img_path, "average_projection.png"
         )  # Search in the subfolder
 
     return data_files

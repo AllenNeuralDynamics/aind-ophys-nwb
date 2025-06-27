@@ -504,6 +504,7 @@ def nwb_ophys_single_plane(
 
         ophys_module.add(images)
     except Exception as e:
+        print(file_paths["planes"][plane_name])
         logging.warning(f"Error adding projection images: {e}")
     """
     if file_paths['planes'][plane_name]["classifier_h5"] is None:
