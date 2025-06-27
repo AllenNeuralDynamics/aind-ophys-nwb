@@ -1197,31 +1197,36 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
     with open(json_path, "r") as f:
         trial_data = json.load(f)
 
-    # Group TIFFs by their base name
-    tiff_groups = {}
+    # Create one TimeIntervals table for all trials
+    if "trials" not in nwbfile.intervals:
+        nwbfile.add_time_intervals(
+            TimeIntervals(
+                name="trials",
+                description="All trial intervals with trial_type column"
+            )
+        )
+
+    trial_type_column = []
+    start_times = []
+    stop_times = []
+
+    # Go through all TIFFs and add trial intervals
     for tiff_name, (start_frame, stop_frame) in trial_data.items():
-        # Extract the base name and index from the TIFF filename
         match = re.match(r"([a-zA-Z0-9_]+)_\d+\.tif", tiff_name)
         if match:
-            base_name = match.group(1)
-            if base_name not in tiff_groups:
-                tiff_groups[base_name] = []
-            # Convert frames to time
+            trial_type = match.group(1)
             start_time = start_frame / frame_rate
             stop_time = stop_frame / frame_rate
-            tiff_groups[base_name].append((start_time, stop_time))
 
-    # Add intervals for each group of TIFFs
-    for base_name, intervals in tiff_groups.items():
-        # Create a new TimeIntervals object for this group
-        trial_intervals = TimeIntervals(name=base_name)
+            nwbfile.trials.add_row(start_time=start_time, stop_time=stop_time)
+            trial_type_column.append(trial_type)
 
-        # Add the rows for this group of TIFFs
-        for start_time, stop_time in intervals:
-            trial_intervals.add_row(start_time=start_time, stop_time=stop_time)
+    # Add trial_type as a custom column
+    if "trial_type" not in nwbfile.trials.colnames:
+        nwbfile.trials.add_column(name="trial_type", description="Trial type from TIFF base name")
 
-        # Add this TimeIntervals object to the NWB file
-        nwbfile.add_time_intervals(trial_intervals)
+    # Fill in the trial_type values (assumes order matches `add_row` calls)
+    nwbfile.trials["trial_type"].data[:] = trial_type_column
 
     return nwbfile
 

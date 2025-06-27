@@ -48,11 +48,7 @@ def singleplane_session_data_files(input_path: Union[str, Path]):
         singleplane_data_path = subfolders[0]
     if len(subfolders) == 0:
         singleplane_data_path = input_path
-    if len(subfolders) != 1 and len(subfolders) != 0:
-        raise ValueError(
-            f"Expected exactly one or zero subfolder in {input_path},  \
-              found {len(subfolders)}"
-        )
+
 
     # This is the actual data directory
 
