@@ -50,7 +50,7 @@ def singleplane_session_data_files(input_path: Union[str, Path]):
         singleplane_data_path = input_path
 
     for subfolder in subfolders:
-        if "behavior_nwb" in subfolder.name:
+        if "capsule" in subfolder.name:
             singleplane_data_path = subfolder
 
     # This is the actual data directory
