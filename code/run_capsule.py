@@ -1197,20 +1197,16 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
     with open(json_path, "r") as f:
         trial_data = json.load(f)
 
-    # Create one TimeIntervals table for all trials
-    if "trials" not in nwbfile.intervals:
-        nwbfile.add_time_intervals(
-            TimeIntervals(
-                name="trials",
-                description="All trial intervals with trial_type column"
-            )
-        )
+    # Initialize trial table
+    trial_table = TimeIntervals(
+        name="trials",
+        description="All trial intervals with trial_type column",
+        columns=[
+            {"name": "trial_type", "description": "Trial type from TIFF base name"},
+        ],
+    )
 
-    trial_type_column = []
-    start_times = []
-    stop_times = []
-
-    # Go through all TIFFs and add trial intervals
+    # Add rows
     for tiff_name, (start_frame, stop_frame) in trial_data.items():
         match = re.match(r"([a-zA-Z0-9_]+)_\d+\.tif", tiff_name)
         if match:
@@ -1218,15 +1214,14 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
             start_time = start_frame / frame_rate
             stop_time = stop_frame / frame_rate
 
-            nwbfile.trials.add_row(start_time=start_time, stop_time=stop_time)
-            trial_type_column.append(trial_type)
+            trial_table.add_row(
+                start_time=start_time,
+                stop_time=stop_time,
+                trial_type=trial_type,
+            )
 
-    # Add trial_type as a custom column
-    if "trial_type" not in nwbfile.trials.colnames:
-        nwbfile.trials.add_column(name="trial_type", description="Trial type from TIFF base name")
-
-    # Fill in the trial_type values (assumes order matches `add_row` calls)
-    nwbfile.trials["trial_type"].data[:] = trial_type_column
+    # Attach to NWB file
+    nwbfile.add_time_intervals(trial_table)
 
     return nwbfile
 
