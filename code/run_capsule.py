@@ -43,7 +43,7 @@ class SegmentationApproach(Enum):
     }
 
 
-def load_pynwb_extension(schema, path):
+def load_pynwb_extension(path):
     neurodata_type = "OphysMetadataSchema"
     pynwb.load_namespaces(path)
     return pynwb.get_class(neurodata_type, "ndx-aibs-behavior-ophys")
@@ -1320,7 +1320,7 @@ if __name__ == "__main__":
         {formatted_date}_{formatted_time}.nwb"
     )
     io_class = set_io_class_backend(input_nwb_fp, output_nwb_fp)
-    name_space = "/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml"
+    name_space = "/schemas/ndx-aibs-behavior-ophys.namespace.yaml"
     if not Path(name_space).is_file():
         raise FileNotFoundError(name_space)
     # OphysMetadata = load_pynwb_extension("", name_space)
@@ -1369,7 +1369,7 @@ if __name__ == "__main__":
             subject_data,
         )
         # Add plane metadata for each plane
-        OphysMetadata = load_pynwb_extension("", name_space)
+        OphysMetadata = load_pynwb_extension(name_space)
         for fov in ophys_fovs:
             plane_metadata = OphysMetadata(
                 name=f'{fov["targeted_structure"]}_{fov["index"]}',
