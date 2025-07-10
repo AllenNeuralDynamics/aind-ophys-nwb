@@ -1199,10 +1199,10 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
 
     # Initialize trial table
     trial_table = TimeIntervals(
-        name="trials",
+        name="epochs",
         description="All trial intervals with trial_type column",
         columns=[
-            {"name": "trial_type", "description": "Trial type from TIFF base name"},
+            {"name": "epoch_type", "description": "epoch type from TIFF base name"},
         ],
     )
 
@@ -1217,7 +1217,7 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
             trial_table.add_row(
                 start_time=start_time,
                 stop_time=stop_time,
-                trial_type=trial_type,
+                epoch_type=trial_type,
             )
 
     # Attach to NWB file
