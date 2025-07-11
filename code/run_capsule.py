@@ -1194,33 +1194,51 @@ def get_sync_timestamps(raw_path: Path) -> np.array:
 
 
 def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
+    """
+    Add epoch intervals to the NWB file based on epochs.json.
+    
+    Parameters
+    ----------
+    json_path : Path or str
+        Path to epochs.json file. Format: {epoch_name: [start_frame, stop_frame]}
+    frame_rate : float
+        Frame rate in Hz used to convert frame indices to seconds.
+    nwbfile : NWBFile
+        The NWB file to which the epochs will be added.
+    
+    Returns
+    -------
+    NWBFile
+        The updated NWB file with epochs added to the TimeIntervals table.
+    """
     with open(json_path, "r") as f:
-        trial_data = json.load(f)
+        epoch_data = json.load(f)
 
-    # Initialize trial table
+    # Create a TimeIntervals table
     trial_table = TimeIntervals(
         name="epochs",
-        description="All trial intervals with trial_type column",
+        description="Epochs for spontaneous and photostim periods",
         columns=[
-            {"name": "epoch_type", "description": "epoch type from TIFF base name"},
+            {"name": "epoch_type", "description": "Epoch type name from key"},
+            {"name": "start_frame", "description": "start_frame"},
+            {"name": "stop_frame", "description":"stop_frame"}
         ],
     )
 
-    # Add rows
-    for tiff_name, (start_frame, stop_frame) in trial_data.items():
-        match = re.match(r"([a-zA-Z0-9_]+)_\d+\.tif", tiff_name)
-        if match:
-            trial_type = match.group(1)
-            start_time = start_frame / frame_rate
-            stop_time = stop_frame / frame_rate
+    # Add intervals
+    for epoch_name, (start_frame, stop_frame) in epoch_data.items():
+        start_time = start_frame / frame_rate
+        stop_time = stop_frame / frame_rate
 
-            trial_table.add_row(
-                start_time=start_time,
-                stop_time=stop_time,
-                epoch_type=trial_type,
-            )
+        trial_table.add_row(
+            start_time=start_time,
+            stop_time=stop_time,
+            start_frame=start_frame,
+            stop_frame=stop_frame,
+            epoch_type=epoch_name,
+        )
 
-    # Attach to NWB file
+    # Add the table to the NWB file
     nwbfile.add_time_intervals(trial_table)
 
     return nwbfile
@@ -1338,8 +1356,8 @@ if __name__ == "__main__":
             session_json = json.load(f)
         frame_rate = get_frame_rate(session_json)
         paths = glob.glob(
-            "/data/processed/*/motion_correction/trial_locations.json"
-        ) + glob.glob("/data/processed/trial_locations.json")
+            "/data/processed/*/motion_correction/epoch_locations.json"
+        ) + glob.glob("/data/processed/epoch_locations.json")
 
         # Grab the first if any found
         sp_interval_path = paths[0] if paths else None
