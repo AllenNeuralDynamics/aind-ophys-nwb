@@ -43,7 +43,7 @@ class SegmentationApproach(Enum):
     }
 
 
-def load_pynwb_extension(schema, path):
+def load_pynwb_extension(path):
     neurodata_type = "OphysMetadataSchema"
     pynwb.load_namespaces(path)
     return pynwb.get_class(neurodata_type, "ndx-aibs-behavior-ophys")
@@ -211,6 +211,14 @@ def load_sparse_array(h5_file):
 
     pixelmasks = sparse.COO(coords, data, shape).todense()
     return pixelmasks
+
+
+def convert_rois_to_segmentation_mask(h5_file):
+    pixelmasks = load_sparse_array(h5_file)
+    segmentation_mask = np.zeros(pixelmasks.shape[1:], dtype="i2")
+    contains_roi = pixelmasks.sum(0) > 0
+    segmentation_mask[contains_roi] = np.argmax(pixelmasks[:, contains_roi], 0) + 1
+    return segmentation_mask
 
 
 def get_segementation_approach(extraction_h5: Path) -> SegmentationApproach:
@@ -762,16 +770,18 @@ def nwb_ophys(
             description="Max intensity projection of entire session",
         )
         if segmentation_approach == SegmentationApproach.SUITE2P_ANATOMICAL:
-            segmetation_mask = load_generic_group(
+            segmentation_mask = load_generic_group(
                 file_paths["planes"][plane_name]["extraction_h5"],
                 h5_group="cellpose",
                 h5_key="masks",
             )
         else:
-            raise NotImplementedError("Cannot process functional segmentation")
+            segmentation_mask = convert_rois_to_segmentation_mask(
+                file_paths["planes"][plane_name]["extraction_h5"]
+            )
         mask_img = GrayscaleImage(
             name="segmentation_mask_image",
-            data=segmetation_mask,
+            data=segmentation_mask,
             resolution=float(plane["fov_scale_factor"]),  # pixels/cm
             description="Segmentation projection of entire session",
         )
@@ -1338,7 +1348,7 @@ if __name__ == "__main__":
         {formatted_date}_{formatted_time}.nwb"
     )
     io_class = set_io_class_backend(input_nwb_fp, output_nwb_fp)
-    name_space = "/data/schemas/ndx-aibs-behavior-ophys.namespace.yaml"
+    name_space = "/schemas/ndx-aibs-behavior-ophys.namespace.yaml"
     if not Path(name_space).is_file():
         raise FileNotFoundError(name_space)
     # OphysMetadata = load_pynwb_extension("", name_space)
@@ -1387,7 +1397,7 @@ if __name__ == "__main__":
             subject_data,
         )
         # Add plane metadata for each plane
-        OphysMetadata = load_pynwb_extension("", name_space)
+        OphysMetadata = load_pynwb_extension(name_space)
         for fov in ophys_fovs:
             plane_metadata = OphysMetadata(
                 name=f'{fov["targeted_structure"]}_{fov["index"]}',
