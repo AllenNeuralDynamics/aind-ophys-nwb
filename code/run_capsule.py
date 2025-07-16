@@ -1204,34 +1204,52 @@ def get_sync_timestamps(raw_path: Path) -> np.array:
 
 
 def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
+    """
+    Add epoch intervals to the NWB file based on epochs.json.
+    
+    Parameters
+    ----------
+    json_path : Path or str
+        Path to epochs.json file. Format: {epoch_name: [start_frame, stop_frame]}
+    frame_rate : float
+        Frame rate in Hz used to convert frame indices to seconds.
+    nwbfile : NWBFile
+        The NWB file to which the epochs will be added.
+    
+    Returns
+    -------
+    NWBFile
+        The updated NWB file with epochs added to the TimeIntervals table.
+    """
     with open(json_path, "r") as f:
-        trial_data = json.load(f)
+        epoch_data = json.load(f)
 
-    # Group TIFFs by their base name
-    tiff_groups = {}
-    for tiff_name, (start_frame, stop_frame) in trial_data.items():
-        # Extract the base name and index from the TIFF filename
-        match = re.match(r"([a-zA-Z0-9_]+)_\d+\.tif", tiff_name)
-        if match:
-            base_name = match.group(1)
-            if base_name not in tiff_groups:
-                tiff_groups[base_name] = []
-            # Convert frames to time
-            start_time = start_frame / frame_rate
-            stop_time = stop_frame / frame_rate
-            tiff_groups[base_name].append((start_time, stop_time))
+    # Create a TimeIntervals table
+    trial_table = TimeIntervals(
+        name="epochs",
+        description="Epochs for spontaneous and photostim periods",
+        columns=[
+            {"name": "stimulus_name", "description": "Epoch type name from key"},
+            {"name": "start_frame", "description": "start_frame"},
+            {"name": "stop_frame", "description":"stop_frame"}
+        ],
+    )
 
-    # Add intervals for each group of TIFFs
-    for base_name, intervals in tiff_groups.items():
-        # Create a new TimeIntervals object for this group
-        trial_intervals = TimeIntervals(name=base_name)
+    # Add intervals
+    for epoch_name, (start_frame, stop_frame) in epoch_data.items():
+        start_time = start_frame / frame_rate
+        stop_time = stop_frame / frame_rate
 
-        # Add the rows for this group of TIFFs
-        for start_time, stop_time in intervals:
-            trial_intervals.add_row(start_time=start_time, stop_time=stop_time)
+        trial_table.add_row(
+            start_time=start_time,
+            stop_time=stop_time,
+            start_frame=start_frame,
+            stop_frame=stop_frame,
+            stimulus_name=epoch_name,
+        )
 
-        # Add this TimeIntervals object to the NWB file
-        nwbfile.add_time_intervals(trial_intervals)
+    # Add the table to the NWB file
+    nwbfile.add_time_intervals(trial_table)
 
     return nwbfile
 
@@ -1348,8 +1366,8 @@ if __name__ == "__main__":
             session_json = json.load(f)
         frame_rate = get_frame_rate(session_json)
         paths = glob.glob(
-            "/data/processed/*/motion_correction/trial_locations.json"
-        ) + glob.glob("/data/processed/trial_locations.json")
+            "/data/processed/*/motion_correction/epoch_locations.json"
+        ) + glob.glob("/data/processed/epoch_locations.json")
 
         # Grab the first if any found
         sp_interval_path = paths[0] if paths else None
