@@ -1348,7 +1348,7 @@ if __name__ == "__main__":
         {formatted_date}_{formatted_time}.nwb"
     )
     io_class = set_io_class_backend(input_nwb_fp, output_nwb_fp)
-    name_space = "/code/ndx-aibs-behavior-ophys.namespace.yaml"
+    name_space = "../code/ndx-aibs-behavior-ophys.namespace.yaml"
     if not Path(name_space).is_file():
         raise FileNotFoundError(name_space)
     # OphysMetadata = load_pynwb_extension("", name_space)
