@@ -1229,7 +1229,7 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
         name="epochs",
         description="Epochs for spontaneous and photostim periods",
         columns=[
-            {"name": "stimulus_name", "description": "Epoch type name from key"},
+            {"name": "epoch_type", "description": "Epoch type name from key"},
             {"name": "start_frame", "description": "start_frame"},
             {"name": "stop_frame", "description":"stop_frame"}
         ],
@@ -1237,6 +1237,12 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
 
     # Add intervals
     for epoch_name, (start_frame, stop_frame) in epoch_data.items():
+        if "neuron" in epoch_name and "slm" not in epoch_name:
+            epoch_name = "BCI"
+        elif "slm" in epoch_name and "post" not in epoch_name:
+            epoch_name = "photostim"
+        elif "slm" in epoch_name and "post" in epoch_name:
+            epoch_name = "photostim_post"
         start_time = start_frame / frame_rate
         stop_time = stop_frame / frame_rate
 
@@ -1245,7 +1251,7 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
             stop_time=stop_time,
             start_frame=start_frame,
             stop_frame=stop_frame,
-            stimulus_name=epoch_name,
+            epoch_type=epoch_name,
         )
 
     # Add the table to the NWB file
