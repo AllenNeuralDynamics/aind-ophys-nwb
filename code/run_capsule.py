@@ -1237,6 +1237,12 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
 
     # Add intervals
     for epoch_name, (start_frame, stop_frame) in epoch_data.items():
+        if "neuron" in epoch_name and "slm" not in epoch_name:
+            epoch_name = "BCI"
+        elif "slm" in epoch_name and "post" not in epoch_name:
+            epoch_name = "photostim"
+        elif "slm" in epoch_name and "post" in epoch_name:
+            epoch_name = "photostim_post"
         start_time = start_frame / frame_rate
         stop_time = stop_frame / frame_rate
 
