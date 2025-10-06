@@ -43,6 +43,17 @@ class SegmentationApproach(Enum):
     }
 
 
+def _get_targeted_structure(fov):
+    if isinstance(fov["targeted_structure"], dict):
+        assert "acronym" in fov["targeted_structure"].keys(), '"acronym" not in fov["targeted_structure"] in session.json'
+        targeted_structure = fov["targeted_structure"]["acronym"]
+    elif isinstance(fov["targeted_structure"], str):
+        targeted_structure = fov["targeted_structure"]
+    else:
+        raise ValueError('fov["targeted_structure"] in session.json must be either dictionary or string')
+    return targeted_structure
+
+
 def load_pynwb_extension(path):
     neurodata_type = "OphysMetadataSchema"
     pynwb.load_namespaces(path)
@@ -324,17 +335,18 @@ def nwb_ophys_single_plane(
     # Get the single plane name from file_paths
     plane_name = list(file_paths["planes"].keys())[0]
     logging.info(f"Processing single plane: {plane_name}")
+    fov = session_json_data["data_streams"][1]["ophys_fovs"][0]
     structure = str(
-        session_json_data["data_streams"][1]["ophys_fovs"][0]["targeted_structure"]
+        _get_targeted_structure(fov)
     )
     imaging_depth = str(
-        session_json_data["data_streams"][1]["ophys_fovs"][0]["imaging_depth"]
+        fov["imaging_depth"]
     )
     step_unit = str(
-        session_json_data["data_streams"][1]["ophys_fovs"][0]["fov_scale_factor_unit"]
+        fov["fov_scale_factor_unit"]
     )
     imaging_depth_unit = str(
-        session_json_data["data_streams"][1]["ophys_fovs"][0]["imaging_depth_unit"]
+        fov["imaging_depth_unit"]
     )
 
     # Create imaging plane with appropriate metadata
@@ -666,11 +678,12 @@ def nwb_ophys(
     device, optical_channel = get_microscope(nwbfile, rig_json_data, session_json_data)
     # Start plane specific processing
     for plane in ophys_fovs:
-        plane_name = f"{plane['targeted_structure']}_{plane['index']}"
+        targeted_structure = _get_targeted_structure(plane)
+        plane_name = f"{targeted_structure}_{plane['index']}"
         logging.info(f"Processing plane: {plane_name}")
         location = (
             "Structure: "
-            + plane["targeted_structure"]
+            + targeted_structure
             + " Depth: "
             + str(plane["imaging_depth"])
         )
@@ -1405,8 +1418,9 @@ if __name__ == "__main__":
         # Add plane metadata for each plane
         OphysMetadata = load_pynwb_extension(name_space)
         for fov in ophys_fovs:
+            targeted_structure = _get_targeted_structure(fov)
             plane_metadata = OphysMetadata(
-                name=f'{fov["targeted_structure"]}_{fov["index"]}',
+                name=f'{targeted_structure}_{fov["index"]}',
                 imaging_depth=str(fov["imaging_depth"]),
                 imaging_plane_group=str(fov["coupled_fov_index"]),
                 field_of_view_width=str(fov["fov_width"]),
