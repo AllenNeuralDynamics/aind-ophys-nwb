@@ -197,6 +197,17 @@ def get_sync_file_path(input_path, verbose=False):
     return sync_file_path
 
 
+def _get_targeted_structure(fov):
+    if isinstance(fov["targeted_structure"], dict):
+        assert "acronym" in fov["targeted_structure"].keys(), '"acronym" not in fov["targeted_structure"] in session.json'
+        targeted_structure = fov["targeted_structure"]["acronym"]
+    elif isinstance(fov["targeted_structure"], str):
+        targeted_structure = fov["targeted_structure"]
+    else:
+        raise ValueError('fov["targeted_structure"] in session.json must be either dictionary or string')
+    return targeted_structure
+
+
 def plane_paths_from_session(
     session_path: Union[Path, str],
     data_level: str = "raw",
@@ -232,7 +243,7 @@ def plane_paths_from_session(
     if fovs != [] and data_level == "processed":
         planes = []
         for fov in fovs:
-            fov_plane = fov["targeted_structure"]
+            fov_plane = _get_targeted_structure(fov)
             fov_index = fov["index"]
             fov_pair = fov_plane + "_" + str(fov_index)
             planes.append(fov_pair)
@@ -365,7 +376,7 @@ def extract_ophys_fovs(session_json: dict):
 
     for fov in ophys_fovs:
         index = fov.get("index")
-        targeted_structure = fov.get("targeted_structure")
+        targeted_structure = _get_targeted_structure(fov)
 
         if index is not None and targeted_structure is not None:
             key = f"{targeted_structure}_{index}"
@@ -435,7 +446,7 @@ def metadata_for_multiplane(data_path: Union[str, Path]) -> dict:
 
     md["session_targeted_structures"] = list(
         set(
-            fov["targeted_structure"]
+            _get_targeted_structure(fov)
             for fov in md["ophys_fovs"].values()
             if "targeted_structure" in fov
         )
