@@ -1317,24 +1317,22 @@ if __name__ == "__main__":
 
     single_plane = False
     multiplane = False
+
+    # Load data description
     json_path = next(input_directory.rglob("data_description.json"))
     with open(json_path, "r") as f:
         data_description = json.load(f)
 
-        if (
-            data_description.get("platform", {}).get("abbreviation")
-            == "single-plane-ophys"
-        ):
-            single_plane = True
-        else:
-            multiplane = True
-    
-    input_nwb_paths = list(input_directory.rglob("nwb/*.nwb"))
-    if len(input_nwb_paths) != 1:
-        raise AssertionError("One valid NWB file must be present in the input directory")
-    input_nwb_fp = input_nwb_paths[0]
-    raw_data_fp = input_directory / 'raw'
-    processed_data_fp = input_directory / 'processed'
+    if data_description.get("platform", {}).get("abbreviation") == "single-plane-ophys":
+        single_plane = True
+    else:
+        multiplane = True
+
+    # Get processed and raw paths
+    raw_data_fp = input_directory / "raw"
+    processed_data_fp = input_directory / "processed"
+
+    # Pull session, subject, rig, and procedures metadata
     session_data, subject_data, rig_data, procedures_data = get_metadata(raw_data_fp)
     try:
         ophys_fovs = session_data["data_streams"][1]["ophys_fovs"]
@@ -1344,38 +1342,30 @@ if __name__ == "__main__":
     file_paths = get_processed_file_paths(
         processed_data_fp, raw_data_fp, ophys_fovs, single_plane
     )
+
+    # Create a new NWB file using aind-nwb-utils
+    input_path = input_directory  # or some representative file path for metadata
+    nwb_file = nwb_utils.create_base_nwb_file(input_path)
+
+    # Generate a timestamped output filename
     current_time = datetime.now()
     formatted_date = current_time.strftime("%Y-%m-%d")
     formatted_time = current_time.strftime("%H-%M-%S")
-    # determine if file is zarr or hdf5, and copy it to results
-    output_nwb_fp = (
-        output_directory
-        / f"{input_nwb_fp.stem}_processed_ \
-        {formatted_date}_{formatted_time}.nwb"
-    )
-    io_class = set_io_class_backend(input_nwb_fp, output_nwb_fp)
-    name_space = "../code/ndx-aibs-behavior-ophys.namespace.yaml"
-    if not Path(name_space).is_file():
-        raise FileNotFoundError(name_space)
-    # OphysMetadata = load_pynwb_extension("", name_space)
-    io = io_class(
-        str(output_nwb_fp),
-        "r+",
-        load_namespaces=True,
-        # extensions=name_space,
-    )
-    nwb_file = io.read()
-    if single_plane:
-        session_json_path = "/data/raw/session.json"
+    output_nwb_fp = output_directory / f"{nwb_file.identifier}_processed_{formatted_date}_{formatted_time}.nwb"
 
+    # Choose IO class
+    io_class = set_io_class_backend(None, output_nwb_fp)
+    io = io_class(str(output_nwb_fp), "w")  # Write mode for a new file
+
+    # Single-plane processing
+    if single_plane:
+        session_json_path = raw_data_fp / "session.json"
         with open(session_json_path, "r") as f:
             session_json = json.load(f)
         frame_rate = get_frame_rate(session_json)
-        paths = glob.glob(
-            "/data/processed/*/motion_correction/epoch_locations.json"
-        ) + glob.glob("/data/processed/epoch_locations.json")
 
-        # Grab the first if any found
+        paths = glob.glob(str(processed_data_fp / "*/motion_correction/epoch_locations.json")) + \
+                glob.glob(str(processed_data_fp / "epoch_locations.json"))
         sp_interval_path = paths[0] if paths else None
 
         nwb_file = add_intervals_sp_nwb(sp_interval_path, frame_rate, nwb_file)
@@ -1389,12 +1379,13 @@ if __name__ == "__main__":
             procedures_data,
             frame_rate,
         )
-        io.write(nwb_file)
 
+    # Multiplane processing
     elif multiplane:
         sync_timestamps = get_sync_timestamps(raw_data_fp)
         ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
-        nwbfile = nwb_ophys(
+
+        nwb_file = nwb_ophys(
             nwb_file,
             file_paths,
             ophys_fovs,
@@ -1402,8 +1393,13 @@ if __name__ == "__main__":
             session_data,
             subject_data,
         )
-        # Add plane metadata for each plane
+
+        # Load extension for plane metadata
+        name_space = "../code/ndx-aibs-behavior-ophys.namespace.yaml"
+        if not Path(name_space).is_file():
+            raise FileNotFoundError(name_space)
         OphysMetadata = load_pynwb_extension(name_space)
+
         for fov in ophys_fovs:
             plane_metadata = OphysMetadata(
                 name=f'{fov["targeted_structure"]}_{fov["index"]}',
@@ -1412,12 +1408,9 @@ if __name__ == "__main__":
                 field_of_view_width=str(fov["fov_width"]),
                 field_of_view_height=str(fov["fov_height"]),
             )
-
-            # Add the lab_metadata to the NWB file
             nwb_file.add_lab_meta_data(plane_metadata)
-        logging.info(nwb_file)
 
-        # write out
-        output_directory = Path(args.output_directory).absolute()
-        logging.info(f"Writing to {output_directory}")
-        io.write(nwb_file)
+    # Write out the NWB file
+    output_directory.mkdir(parents=True, exist_ok=True)
+    logging.info(f"Writing NWB file to {output_nwb_fp}")
+    io.write(nwb_file)
