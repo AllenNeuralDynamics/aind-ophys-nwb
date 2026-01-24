@@ -4,7 +4,6 @@ import glob
 import json
 import logging
 import os
-import shutil
 from collections import defaultdict
 from datetime import datetime
 from enum import Enum
@@ -24,7 +23,7 @@ import aind_nwb_utils.utils as nwb_utils
 from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
 from hdmf.common import VectorData
 from hdmf_zarr import NWBZarrIO
-from pynwb import NWBHDF5IO, NWBFile
+from pynwb import NWBFile
 from pynwb.epoch import TimeIntervals
 from pynwb.image import GrayscaleImage, Images, ImageSeries
 from pynwb.ophys import (
@@ -1052,8 +1051,6 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
     )
 
 
-
-
 def sync_times_to_multiplane_fovs(
     ophys_fovs: list, sync_timestamps: np.array
 ) -> list:
@@ -1254,7 +1251,8 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
     Parameters
     ----------
     json_path : Path or str
-        Path to epochs.json file. Format: {epoch_name: [start_frame, stop_frame]}
+        Path to epochs.json file. Format:
+            {epoch_name: [start_frame, stop_frame]}
     frame_rate : float
         Frame rate in Hz used to convert frame indices to seconds.
     nwbfile : NWBFile
