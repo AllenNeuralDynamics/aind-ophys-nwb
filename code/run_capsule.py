@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 import pynwb
 import sparse
+import aind_nwb_utils.utils as nwb_utils
 from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
 from hdmf.common import VectorData
 from hdmf_zarr import NWBZarrIO
@@ -1322,11 +1323,13 @@ if __name__ == "__main__":
     json_path = next(input_directory.rglob("data_description.json"))
     with open(json_path, "r") as f:
         data_description = json.load(f)
+        nwb_name = data_description['name']
 
     if data_description.get("platform", {}).get("abbreviation") == "single-plane-ophys":
         single_plane = True
     else:
         multiplane = True
+
 
     # Get processed and raw paths
     raw_data_fp = input_directory / "raw"
@@ -1344,17 +1347,16 @@ if __name__ == "__main__":
     )
 
     # Create a new NWB file using aind-nwb-utils
-    input_path = input_directory  # or some representative file path for metadata
-    nwb_file = nwb_utils.create_base_nwb_file(input_path)
+    nwb_file = nwb_utils.create_base_nwb_file(raw_data_fp)
 
     # Generate a timestamped output filename
     current_time = datetime.now()
     formatted_date = current_time.strftime("%Y-%m-%d")
     formatted_time = current_time.strftime("%H-%M-%S")
-    output_nwb_fp = output_directory / f"{nwb_file.identifier}_processed_{formatted_date}_{formatted_time}.nwb"
+    output_nwb_fp = output_directory / f"{nwb_name}.nwb"
 
     # Choose IO class
-    io_class = set_io_class_backend(None, output_nwb_fp)
+    io_class = NWBZarrIO
     io = io_class(str(output_nwb_fp), "w")  # Write mode for a new file
 
     # Single-plane processing
