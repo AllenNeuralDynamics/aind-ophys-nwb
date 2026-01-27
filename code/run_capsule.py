@@ -1369,7 +1369,6 @@ if __name__ == "__main__":
     json_path = next(input_directory.rglob("data_description.json"))
     with open(json_path, "r") as f:
         data_description = json.load(f)
-        nwb_name = data_description["name"]
 
     if (
         data_description.get("platform", {}).get("abbreviation")
@@ -1403,7 +1402,7 @@ if __name__ == "__main__":
     current_time = datetime.now()
     formatted_date = current_time.strftime("%Y-%m-%d")
     formatted_time = current_time.strftime("%H-%M-%S")
-    output_nwb_fp = output_directory / f"{nwb_name}.nwb"
+    output_nwb_fp = output_directory / "pophys_nwb"
 
     # Choose IO class
     io_class = NWBZarrIO
