@@ -1,6 +1,6 @@
 # hash:sha256:deed82a22bccda3868240d700f2a1a18d6dbecb6b45afc713030487561e9db7b
 ARG REGISTRY_HOST
-FROM $REGISTRY_HOST/codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04
+FROM $REGISTRY_HOST/codeocean/mambaforge3:23.1.0-4-python3.10.12-ubuntu22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -23,6 +23,7 @@ RUN pip install -U --no-cache-dir \
     tifffile \
     imageio \
     aind-metadata-mapper \
+    aind-nwb-utils==0.1.6\
     nwbwidgets \
     numpy==1.26.4 \
     marshmallow \

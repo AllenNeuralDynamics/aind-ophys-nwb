@@ -16,4 +16,3 @@ if [ ! -d "/.vscode/extensions" ]
           echo "code-server not found"
        fi
 
-#pip install pynwb
