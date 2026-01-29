@@ -1402,7 +1402,7 @@ if __name__ == "__main__":
     current_time = datetime.now()
     formatted_date = current_time.strftime("%Y-%m-%d")
     formatted_time = current_time.strftime("%H-%M-%S")
-    output_nwb_fp = output_directory / "pophys_nwb"
+    output_nwb_fp = output_directory / "pophys_nwb.zarr"
 
     # Choose IO class
     io_class = NWBZarrIO
