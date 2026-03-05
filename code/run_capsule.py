@@ -728,7 +728,7 @@ def nwb_ophys(
             name=plane_name,  # ophys_plane_id
             optical_channel=optical_channel,
             imaging_rate=float(plane["frame_rate"]),
-            description="Two-photon imaging plane a",
+            description="Two-photon imaging plane",
             device=device,
             excitation_lambda=float(
                 session_json_data["data_streams"][0]["light_sources"][0][
