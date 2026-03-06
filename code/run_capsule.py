@@ -570,7 +570,7 @@ def nwb_ophys_single_plane(
 
         # Create time series using frame rate
         roi_traces_series = RoiResponseSeries(
-            name="ROI_fluorescence",
+            name="roi_fluorescence",
             data=roi_traces.T,
             rois=roi_names,
             unit="a.u.",
@@ -875,7 +875,7 @@ def nwb_ophys(
             h5_key="roi",
         )
         roi_traces_series = RoiResponseSeries(
-            name="ROI_fluorescence_timeseries",
+            name="roi_fluorescence_timeseries",
             data=roi_traces.T,
             rois=roi_names,
             unit="a.u.",
