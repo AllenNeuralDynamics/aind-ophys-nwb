@@ -570,7 +570,7 @@ def nwb_ophys_single_plane(
 
         # Create time series using frame rate
         roi_traces_series = RoiResponseSeries(
-            name="ROI_fluorescence",
+            name="roi_fluorescence",
             data=roi_traces.T,
             rois=roi_names,
             unit="a.u.",
@@ -728,7 +728,7 @@ def nwb_ophys(
             name=plane_name,  # ophys_plane_id
             optical_channel=optical_channel,
             imaging_rate=float(plane["frame_rate"]),
-            description="Two-photon imaging plane a",
+            description="Two-photon imaging plane",
             device=device,
             excitation_lambda=float(
                 session_json_data["data_streams"][0]["light_sources"][0][
@@ -875,7 +875,7 @@ def nwb_ophys(
             h5_key="roi",
         )
         roi_traces_series = RoiResponseSeries(
-            name="ROI_fluorescence_timeseries",
+            name="roi_fluorescence_timeseries",
             data=roi_traces.T,
             rois=roi_names,
             unit="a.u.",
