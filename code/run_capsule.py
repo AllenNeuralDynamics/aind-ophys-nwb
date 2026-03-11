@@ -29,6 +29,7 @@ from pynwb.image import GrayscaleImage, Images, ImageSeries
 from pynwb.ophys import (
     DfOverF,
     Fluorescence,
+    ImagingPlane,
     ImageSegmentation,
     OpticalChannel,
     RoiResponseSeries,
@@ -236,6 +237,65 @@ def load_sparse_array(h5_file):
 
     pixelmasks = sparse.COO(coords, data, shape).todense()
     return pixelmasks
+
+
+def load_neuropil_masks(h5_file: Path) -> np.ndarray:
+    """Load neuropil pixel masks from the h5 file
+
+    Parameters
+    ----------
+    h5_file : Path
+        The path to the h5 file
+
+    Returns
+    -------
+    np.ndarray
+        Dense array of shape (n_rois, height, width) with neuropil masks
+    """
+    with h5py.File(h5_file, "r") as f:
+        indices = f["rois"]["neuropil_coords"][:].T
+        shape = f["rois"]["shape"][:]
+    neuropil_mask = np.zeros(shape)
+    neuropil_mask[indices[:, 0], indices[:, 1], indices[:, 2]] = 1
+    return neuropil_mask
+
+
+def add_neuropil_segmentation(
+    extraction_h5: Path,
+    segmentation_approach: SegmentationApproach,
+    img_seg: ImageSegmentation,
+    imaging_plane: ImagingPlane,
+) -> None:
+    """Add neuropil segmentation masks to an ImageSegmentation object.
+
+    Only runs for suite2p-based segmentation approaches.
+
+    Parameters
+    ----------
+    extraction_h5 : Path
+        Path to the extraction HDF5 file containing neuropil coords.
+    segmentation_approach : SegmentationApproach
+        The segmentation approach used.
+    img_seg : ImageSegmentation
+        The NWB ImageSegmentation object to add the plane segmentation to.
+    imaging_plane : ImagingPlane
+        The NWB ImagingPlane associated with this segmentation.
+    """
+    try:
+        if segmentation_approach in (
+            SegmentationApproach.SUITE2P_ANATOMICAL,
+            SegmentationApproach.SUITE2P_ACTIVITY,
+        ):
+            neuropil_masks = load_neuropil_masks(extraction_h5)
+            neuropil_plane_segmentation = img_seg.create_plane_segmentation(
+                name="neuropil_masks",
+                description="Neuropil segmentation masks from suite2p",
+                imaging_plane=imaging_plane,
+            )
+            for neuropil_mask in neuropil_masks:
+                neuropil_plane_segmentation.add_roi(image_mask=neuropil_mask)
+    except Exception as e:
+        logging.warning(f"Error adding neuropil segmentation masks: {e}")
 
 
 def convert_rois_to_segmentation_mask(h5_file):
@@ -500,6 +560,13 @@ def nwb_ophys_single_plane(
             )
         ):
             plane_segmentation.add_roi(image_mask=pixel_mask)
+
+    add_neuropil_segmentation(
+        file_paths["planes"][plane_name]["extraction_h5"],
+        segmentation_approach,
+        img_seg,
+        imaging_plane,
+    )
 
     ophys_module.add(img_seg)
 
@@ -800,6 +867,14 @@ def nwb_ophys(
                 "dendrite_probability",
             ],
         )
+
+        add_neuropil_segmentation(
+            file_paths["planes"][plane_name]["extraction_h5"],
+            segmentation_approach,
+            img_seg,
+            imaging_plane,
+        )
+
         ophys_module.add(img_seg)
 
         avg_projection = plt.imread(
