@@ -294,6 +294,12 @@ def add_neuropil_segmentation(
             )
             for neuropil_mask in neuropil_masks:
                 neuropil_plane_segmentation.add_roi(image_mask=neuropil_mask)
+        else:
+            logging.info(
+                "Skipping neuropil segmentation. Currently only supported "
+                "for suite2p-based segmentation approaches. "
+                f"Segmentation approach used: {segmentation_approach}"
+            )
     except Exception as e:
         logging.warning(f"Error adding neuropil segmentation masks: {e}")
 
