@@ -301,7 +301,7 @@ def add_neuropil_segmentation_and_r_values(
                 neuropil_plane_segmentation.add_roi(image_mask=neuropil_mask)
 
             neuropil_plane_segmentation.add_column(
-                name="Neuropil r values",
+                name="neuropil_r_value",
                 description="Coefficients used for neuropil correction",
                 data=r_values
             )
