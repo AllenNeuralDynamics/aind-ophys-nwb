@@ -255,8 +255,8 @@ def load_neuropil_masks(h5_file: Path) -> np.ndarray:
     with h5py.File(h5_file, "r") as f:
         indices = f["rois"]["neuropil_coords"][:].T
         shape = f["rois"]["shape"][:]
-    neuropil_mask = np.zeros(shape)
-    neuropil_mask[indices[:, 0], indices[:, 1], indices[:, 2]] = 1
+    neuropil_mask = np.zeros(shape, dtype=bool)
+    neuropil_mask[indices[:, 0], indices[:, 1], indices[:, 2]] = True
     return neuropil_mask
 
 
