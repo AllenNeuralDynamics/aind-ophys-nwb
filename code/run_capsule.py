@@ -267,50 +267,35 @@ def load_neuropil_masks_and_r_values(h5_file: Path) -> tuple[np.ndarray, np.ndar
 
 def add_neuropil_segmentation_and_r_values(
     extraction_h5: Path,
-    segmentation_approach: SegmentationApproach,
     img_seg: ImageSegmentation,
     imaging_plane: ImagingPlane,
 ) -> None:
     """Add neuropil segmentation masks and r-values to an ImageSegmentation object.
 
-    Only runs for suite2p-based segmentation approaches.
-
     Parameters
     ----------
     extraction_h5 : Path
         Path to the extraction HDF5 file containing neuropil coords.
-    segmentation_approach : SegmentationApproach
-        The segmentation approach used.
     img_seg : ImageSegmentation
         The NWB ImageSegmentation object to add the plane segmentation to.
     imaging_plane : ImagingPlane
         The NWB ImagingPlane associated with this segmentation.
     """
     try:
-        if segmentation_approach in (
-            SegmentationApproach.SUITE2P_ANATOMICAL,
-            SegmentationApproach.SUITE2P_ACTIVITY,
-        ):
-            neuropil_masks, r_values = load_neuropil_masks_and_r_values(extraction_h5)
-            neuropil_plane_segmentation = img_seg.create_plane_segmentation(
-                name="neuropil_masks",
-                description="Neuropil segmentation masks from suite2p",
-                imaging_plane=imaging_plane,
-            )
-            for neuropil_mask in neuropil_masks:
-                neuropil_plane_segmentation.add_roi(image_mask=neuropil_mask)
+        neuropil_masks, r_values = load_neuropil_masks_and_r_values(extraction_h5)
+        neuropil_plane_segmentation = img_seg.create_plane_segmentation(
+            name="neuropil_masks",
+            description="Neuropil segmentation masks from suite2p",
+            imaging_plane=imaging_plane,
+        )
+        for neuropil_mask in neuropil_masks:
+            neuropil_plane_segmentation.add_roi(image_mask=neuropil_mask)
 
-            neuropil_plane_segmentation.add_column(
-                name="neuropil_r_value",
-                description="Coefficients used for neuropil correction",
-                data=r_values
-            )
-        else:
-            logging.info(
-                "Skipping neuropil segmentation. Currently only supported "
-                "for suite2p-based segmentation approaches. "
-                f"Segmentation approach used: {segmentation_approach}"
-            )
+        neuropil_plane_segmentation.add_column(
+            name="neuropil_r_value",
+            description="Coefficients used for neuropil correction",
+            data=r_values
+        )
     except Exception as e:
         logging.warning(f"Error adding neuropil segmentation masks: {e}")
 
@@ -578,12 +563,21 @@ def nwb_ophys_single_plane(
         ):
             plane_segmentation.add_roi(image_mask=pixel_mask)
 
-    add_neuropil_segmentation_and_r_values(
-        file_paths["planes"][plane_name]["extraction_h5"],
-        segmentation_approach,
-        img_seg,
-        imaging_plane,
-    )
+    if segmentation_approach in (
+        SegmentationApproach.SUITE2P_ANATOMICAL,
+        SegmentationApproach.SUITE2P_ACTIVITY,
+    ):
+        add_neuropil_segmentation_and_r_values(
+            file_paths["planes"][plane_name]["extraction_h5"],
+            img_seg,
+            imaging_plane,
+        )
+    else:
+        logging.info(
+            "Skipping neuropil segmentation. Currently only supported "
+            "for suite2p-based segmentation approaches. "
+            f"Segmentation approach used: {segmentation_approach}"
+        )
 
     ophys_module.add(img_seg)
 
@@ -885,12 +879,21 @@ def nwb_ophys(
             ],
         )
 
-        add_neuropil_segmentation_and_r_values(
-            file_paths["planes"][plane_name]["extraction_h5"],
-            segmentation_approach,
-            img_seg,
-            imaging_plane,
-        )
+        if segmentation_approach in (
+            SegmentationApproach.SUITE2P_ANATOMICAL,
+            SegmentationApproach.SUITE2P_ACTIVITY,
+        ):
+            add_neuropil_segmentation_and_r_values(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                img_seg,
+                imaging_plane,
+            )
+        else:
+            logging.info(
+                "Skipping neuropil segmentation. Currently only supported "
+                "for suite2p-based segmentation approaches. "
+                f"Segmentation approach used: {segmentation_approach}"
+            )
 
         ophys_module.add(img_seg)
 
