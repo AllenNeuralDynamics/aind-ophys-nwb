@@ -20,7 +20,7 @@ import pandas as pd
 import pynwb
 import sparse
 import aind_nwb_utils.utils as nwb_utils
-from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
+from aind_behavior_utils.sync.sync_dataset import SyncDataset
 from hdmf.common import VectorData
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBFile
@@ -1298,13 +1298,19 @@ def _sync_timestamps(sync_fp: Path) -> np.array:
     np.array
         The sync timestamps
     """
-    sync_dataset = sync.load_sync(sync_fp)
-    return sync.get_edges(
-        sync_file=sync_dataset,
-        kind="rising",
-        keys=["vsync_2p", "2p_vsync"],
-        units="seconds",
-    )
+    sync_dataset = SyncDataset(sync_fp)
+
+    try:
+        return sync_dataset.get_rising_edges(
+            line="2p_vsync",
+            units="seconds"
+        )
+    except ValueError:
+        logging.warning("Failed to find 2p_vsync line. Trying with vsync_2p")
+        return sync_dataset.get_rising_edges(
+            line="vsync_2p",
+            units="seconds"
+        )
 
 
 def get_sync_timestamps(raw_path: Path) -> np.array:

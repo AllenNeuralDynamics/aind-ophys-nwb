@@ -6,7 +6,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 ARG GIT_ASKPASS
 ARG GIT_ACCESS_TOKEN
-COPY git-askpass /
+COPY git-ask-pass /
 
 RUN apt-get update
 
@@ -22,7 +22,7 @@ RUN pip install -U --no-cache-dir \
 	pynwb==2.8.3 \
     tifffile \
     imageio \
-    aind-metadata-mapper \
+    aind-behavior-utils \
     aind-nwb-utils==0.1.6\
     nwbwidgets \
     numpy==1.26.4 \
