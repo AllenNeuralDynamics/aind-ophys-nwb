@@ -269,8 +269,10 @@ def add_neuropil_segmentation_and_r_values(
     extraction_h5: Path,
     img_seg: ImageSegmentation,
     imaging_plane: ImagingPlane,
-) -> None:
-    """Add neuropil segmentation masks and r-values to an ImageSegmentation object.
+    resolution: float = 1.0,
+) -> "GrayscaleImage | None":
+    """Add neuropil segmentation masks and r-values to an ImageSegmentation object,
+    and return a GrayscaleImage of the collapsed neuropil mask.
 
     Parameters
     ----------
@@ -280,6 +282,13 @@ def add_neuropil_segmentation_and_r_values(
         The NWB ImageSegmentation object to add the plane segmentation to.
     imaging_plane : ImagingPlane
         The NWB ImagingPlane associated with this segmentation.
+    resolution : float
+        Pixel resolution to set on the returned GrayscaleImage (pixels/cm).
+
+    Returns
+    -------
+    GrayscaleImage or None
+        A GrayscaleImage of the 2-D neuropil mask, or None if creation failed.
     """
     try:
         neuropil_masks, r_values = load_neuropil_masks_and_r_values(extraction_h5)
@@ -294,10 +303,41 @@ def add_neuropil_segmentation_and_r_values(
         neuropil_plane_segmentation.add_column(
             name="neuropil_r_value",
             description="Coefficients used for neuropil correction",
-            data=r_values
+            data=r_values,
+        )
+
+        neuropil_mask_2d = convert_neuropil_masks_to_image(neuropil_masks)
+        return GrayscaleImage(
+            name="neuropil_mask_image",
+            data=neuropil_mask_2d,
+            resolution=resolution,
+            description="Neuropil segmentation mask image",
         )
     except Exception as e:
         logging.warning(f"Error adding neuropil segmentation masks: {e}")
+        return None
+
+
+def convert_neuropil_masks_to_image(neuropil_masks: np.ndarray) -> np.ndarray:
+    """Collapse 3D neuropil masks into a 2D label image.
+
+    Parameters
+    ----------
+    neuropil_masks : np.ndarray
+        Boolean array of shape (n_rois, height, width).
+
+    Returns
+    -------
+    np.ndarray
+        2D array of shape (height, width) where each pixel value is the
+        1-based index of the neuropil mask that covers it (0 = no mask).
+    """
+    segmentation_mask = np.zeros(neuropil_masks.shape[1:], dtype="i2")
+    contains_neuropil = neuropil_masks.any(0)
+    segmentation_mask[contains_neuropil] = (
+        np.argmax(neuropil_masks[:, contains_neuropil], 0) + 1
+    )
+    return segmentation_mask
 
 
 def convert_rois_to_segmentation_mask(h5_file):
@@ -563,11 +603,12 @@ def nwb_ophys_single_plane(
         ):
             plane_segmentation.add_roi(image_mask=pixel_mask)
 
+    neuropil_img = None
     if segmentation_approach in (
         SegmentationApproach.SUITE2P_ANATOMICAL,
         SegmentationApproach.SUITE2P_ACTIVITY,
     ):
-        add_neuropil_segmentation_and_r_values(
+        neuropil_img = add_neuropil_segmentation_and_r_values(
             file_paths["planes"][plane_name]["extraction_h5"],
             img_seg,
             imaging_plane,
@@ -605,6 +646,7 @@ def nwb_ophys_single_plane(
         )
 
         # Try to add segmentation mask if available
+        summary_images = [avg_img, max_img]
         if segmentation_approach == SegmentationApproach.SUITE2P_ANATOMICAL:
             segmentation_mask = load_generic_group(
                 file_paths["planes"][plane_name]["extraction_h5"],
@@ -617,17 +659,16 @@ def nwb_ophys_single_plane(
                 resolution=1.0,  # Update if available
                 description="Segmentation projection of entire session",
             )
-            images = Images(
-                name="images",
-                images=[avg_img, max_img, mask_img],
-                description="Summary images of the ophys movie",
-            )
-        else:
-            images = Images(
-                name="images",
-                images=[avg_img, max_img],
-                description="Summary images of the ophys movie",
-            )
+            summary_images.append(mask_img)
+
+        if neuropil_img is not None:
+            summary_images.append(neuropil_img)
+
+        images = Images(
+            name="images",
+            images=summary_images,
+            description="Summary images of the ophys movie",
+        )
 
         ophys_module.add(images)
     except Exception as e:
@@ -879,14 +920,16 @@ def nwb_ophys(
             ],
         )
 
+        neuropil_img = None
         if segmentation_approach in (
             SegmentationApproach.SUITE2P_ANATOMICAL,
             SegmentationApproach.SUITE2P_ACTIVITY,
         ):
-            add_neuropil_segmentation_and_r_values(
+            neuropil_img = add_neuropil_segmentation_and_r_values(
                 file_paths["planes"][plane_name]["extraction_h5"],
                 img_seg,
                 imaging_plane,
+                resolution=float(plane["fov_scale_factor"]),
             )
         else:
             logging.info(
@@ -932,9 +975,13 @@ def nwb_ophys(
             description="Segmentation projection of entire session",
         )
 
+        summary_images = [avg_img, max_img, mask_img]
+        if neuropil_img is not None:
+            summary_images.append(neuropil_img)
+
         images = Images(
             name="images",
-            images=[avg_img, max_img, mask_img],
+            images=summary_images,
             description="Summary images of the two-photon movie",
         )
         ophys_module.add(images)
