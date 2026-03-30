@@ -293,7 +293,7 @@ def add_neuropil_segmentation_and_r_values(
     try:
         neuropil_masks, r_values = load_neuropil_masks_and_r_values(extraction_h5)
         neuropil_plane_segmentation = img_seg.create_plane_segmentation(
-            name="neuropil_masks",
+            name="neuropil_table",
             description="Neuropil segmentation masks from suite2p",
             imaging_plane=imaging_plane,
         )
