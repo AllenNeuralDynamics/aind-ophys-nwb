@@ -20,7 +20,7 @@ import pandas as pd
 import pynwb
 import sparse
 import aind_nwb_utils.utils as nwb_utils
-from aind_metadata_mapper.open_ephys.utils import sync_utils as sync
+from aind_behavior_utils.sync.sync_dataset import SyncDataset
 from hdmf.common import VectorData
 from hdmf_zarr import NWBZarrIO
 from pynwb import NWBFile
@@ -29,6 +29,7 @@ from pynwb.image import GrayscaleImage, Images, ImageSeries
 from pynwb.ophys import (
     DfOverF,
     Fluorescence,
+    ImagingPlane,
     ImageSegmentation,
     OpticalChannel,
     RoiResponseSeries,
@@ -236,6 +237,107 @@ def load_sparse_array(h5_file):
 
     pixelmasks = sparse.COO(coords, data, shape).todense()
     return pixelmasks
+
+
+def load_neuropil_masks_and_r_values(h5_file: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Load neuropil pixel masks and r-values from the h5 file
+
+    Parameters
+    ----------
+    h5_file : Path
+        The path to the h5 file
+
+    Returns
+    -------
+    np.ndarray
+        Dense array of shape (n_rois, height, width) with neuropil masks
+    np.ndarray
+        Array of shape (n_rois,) with r-values for each neuropil mask
+    """
+    with h5py.File(h5_file, "r") as f:
+        indices = f["rois"]["neuropil_coords"][:].T
+        shape = f["rois"]["shape"][:]
+
+        r_values = f["traces"]["neuropil_rcoef"][:]
+
+    neuropil_mask = np.zeros(shape, dtype=bool)
+    neuropil_mask[indices[:, 0], indices[:, 1], indices[:, 2]] = True
+    return neuropil_mask, r_values
+
+
+def add_neuropil_segmentation_and_r_values(
+    extraction_h5: Path,
+    img_seg: ImageSegmentation,
+    imaging_plane: ImagingPlane,
+    resolution: float = 1.0,
+) -> "GrayscaleImage | None":
+    """Add neuropil segmentation masks and r-values to an ImageSegmentation object,
+    and return a GrayscaleImage of the collapsed neuropil mask.
+
+    Parameters
+    ----------
+    extraction_h5 : Path
+        Path to the extraction HDF5 file containing neuropil coords.
+    img_seg : ImageSegmentation
+        The NWB ImageSegmentation object to add the plane segmentation to.
+    imaging_plane : ImagingPlane
+        The NWB ImagingPlane associated with this segmentation.
+    resolution : float
+        Pixel resolution to set on the returned GrayscaleImage (pixels/cm).
+
+    Returns
+    -------
+    GrayscaleImage or None
+        A GrayscaleImage of the 2-D neuropil mask, or None if creation failed.
+    """
+    try:
+        neuropil_masks, r_values = load_neuropil_masks_and_r_values(extraction_h5)
+        neuropil_plane_segmentation = img_seg.create_plane_segmentation(
+            name="neuropil_table",
+            description="Neuropil segmentation masks from suite2p",
+            imaging_plane=imaging_plane,
+        )
+        for neuropil_mask in neuropil_masks:
+            neuropil_plane_segmentation.add_roi(image_mask=neuropil_mask)
+
+        neuropil_plane_segmentation.add_column(
+            name="neuropil_r_value",
+            description="Coefficients used for neuropil correction",
+            data=r_values,
+        )
+
+        neuropil_mask_2d = convert_neuropil_masks_to_image(neuropil_masks)
+        return GrayscaleImage(
+            name="neuropil_mask_image",
+            data=neuropil_mask_2d,
+            resolution=resolution,
+            description="Neuropil segmentation mask image",
+        )
+    except Exception as e:
+        logging.warning(f"Error adding neuropil segmentation masks: {e}")
+        return None
+
+
+def convert_neuropil_masks_to_image(neuropil_masks: np.ndarray) -> np.ndarray:
+    """Collapse 3D neuropil masks into a 2D label image.
+
+    Parameters
+    ----------
+    neuropil_masks : np.ndarray
+        Boolean array of shape (n_rois, height, width).
+
+    Returns
+    -------
+    np.ndarray
+        2D array of shape (height, width) where each pixel value is the
+        1-based index of the neuropil mask that covers it (0 = no mask).
+    """
+    segmentation_mask = np.zeros(neuropil_masks.shape[1:], dtype="i2")
+    contains_neuropil = neuropil_masks.any(0)
+    segmentation_mask[contains_neuropil] = (
+        np.argmax(neuropil_masks[:, contains_neuropil], 0) + 1
+    )
+    return segmentation_mask
 
 
 def convert_rois_to_segmentation_mask(h5_file):
@@ -501,6 +603,23 @@ def nwb_ophys_single_plane(
         ):
             plane_segmentation.add_roi(image_mask=pixel_mask)
 
+    neuropil_img = None
+    if segmentation_approach in (
+        SegmentationApproach.SUITE2P_ANATOMICAL,
+        SegmentationApproach.SUITE2P_ACTIVITY,
+    ):
+        neuropil_img = add_neuropil_segmentation_and_r_values(
+            file_paths["planes"][plane_name]["extraction_h5"],
+            img_seg,
+            imaging_plane,
+        )
+    else:
+        logging.info(
+            "Skipping neuropil segmentation. Currently only supported "
+            "for suite2p-based segmentation approaches. "
+            f"Segmentation approach used: {segmentation_approach}"
+        )
+
     ophys_module.add(img_seg)
 
     # Add projections and images
@@ -527,6 +646,7 @@ def nwb_ophys_single_plane(
         )
 
         # Try to add segmentation mask if available
+        summary_images = [avg_img, max_img]
         if segmentation_approach == SegmentationApproach.SUITE2P_ANATOMICAL:
             segmentation_mask = load_generic_group(
                 file_paths["planes"][plane_name]["extraction_h5"],
@@ -539,17 +659,16 @@ def nwb_ophys_single_plane(
                 resolution=1.0,  # Update if available
                 description="Segmentation projection of entire session",
             )
-            images = Images(
-                name="images",
-                images=[avg_img, max_img, mask_img],
-                description="Summary images of the ophys movie",
-            )
-        else:
-            images = Images(
-                name="images",
-                images=[avg_img, max_img],
-                description="Summary images of the ophys movie",
-            )
+            summary_images.append(mask_img)
+
+        if neuropil_img is not None:
+            summary_images.append(neuropil_img)
+
+        images = Images(
+            name="images",
+            images=summary_images,
+            description="Summary images of the ophys movie",
+        )
 
         ophys_module.add(images)
     except Exception as e:
@@ -800,6 +919,25 @@ def nwb_ophys(
                 "dendrite_probability",
             ],
         )
+
+        neuropil_img = None
+        if segmentation_approach in (
+            SegmentationApproach.SUITE2P_ANATOMICAL,
+            SegmentationApproach.SUITE2P_ACTIVITY,
+        ):
+            neuropil_img = add_neuropil_segmentation_and_r_values(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                img_seg,
+                imaging_plane,
+                resolution=float(plane["fov_scale_factor"]),
+            )
+        else:
+            logging.info(
+                "Skipping neuropil segmentation. Currently only supported "
+                "for suite2p-based segmentation approaches. "
+                f"Segmentation approach used: {segmentation_approach}"
+            )
+
         ophys_module.add(img_seg)
 
         avg_projection = plt.imread(
@@ -837,9 +975,13 @@ def nwb_ophys(
             description="Segmentation projection of entire session",
         )
 
+        summary_images = [avg_img, max_img, mask_img]
+        if neuropil_img is not None:
+            summary_images.append(neuropil_img)
+
         images = Images(
             name="images",
-            images=[avg_img, max_img, mask_img],
+            images=summary_images,
             description="Summary images of the two-photon movie",
         )
         ophys_module.add(images)
@@ -1203,13 +1345,19 @@ def _sync_timestamps(sync_fp: Path) -> np.array:
     np.array
         The sync timestamps
     """
-    sync_dataset = sync.load_sync(sync_fp)
-    return sync.get_edges(
-        sync_file=sync_dataset,
-        kind="rising",
-        keys=["vsync_2p", "2p_vsync"],
-        units="seconds",
-    )
+    sync_dataset = SyncDataset(sync_fp)
+
+    try:
+        return sync_dataset.get_rising_edges(
+            line="2p_vsync",
+            units="seconds"
+        )
+    except ValueError:
+        logging.warning("Failed to find 2p_vsync line. Trying with vsync_2p")
+        return sync_dataset.get_rising_edges(
+            line="vsync_2p",
+            units="seconds"
+        )
 
 
 def get_sync_timestamps(raw_path: Path) -> np.array:
