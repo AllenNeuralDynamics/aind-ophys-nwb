@@ -6,9 +6,12 @@ import logging
 import os
 from collections import defaultdict
 from datetime import datetime
+from dateutil.tz import tzlocal
 from enum import Enum
 from pathlib import Path
 from typing import List, Tuple, Union
+import time
+import uuid
 
 # capsule
 import file_handling
@@ -1544,7 +1547,11 @@ if __name__ == "__main__":
     )
 
     # Create a new NWB file using aind-nwb-utils
-    nwb_file = nwb_utils.create_base_nwb_file(raw_data_fp)
+    nwb_file = nwbfile = NWBFile(
+        session_description="Ophys NWB file to test Zarr v3",
+        identifier=str(uuid.uuid4()),
+        session_start_time=datetime.now(tzlocal()),
+    )
 
     # Generate a timestamped output filename
     current_time = datetime.now()

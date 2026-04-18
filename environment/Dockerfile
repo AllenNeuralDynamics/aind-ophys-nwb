@@ -19,7 +19,7 @@ RUN pip install -U --no-cache-dir \
     h5py \
     hdmf \
     git+https://github.com/hdmf-dev/hdmf-zarr.git@zarr-v3-migration \
-	pynwb==2.8.3 \
+	pynwb \
     tifffile \
     imageio \
     aind-behavior-utils \
