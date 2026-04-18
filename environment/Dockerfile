@@ -17,16 +17,12 @@ RUN pip install -U --no-cache-dir \
     matplotlib \
     pandas \
     h5py \
-    hdmf \
     git+https://github.com/hdmf-dev/hdmf-zarr.git@zarr-v3-migration \
-	pynwb \
     tifffile \
     imageio \
     aind-behavior-utils \
     aind-nwb-utils==0.1.6\
-    nwbwidgets \
     numpy==1.26.4 \
-    marshmallow \
     sparse
 
 # install versions for github copilot
