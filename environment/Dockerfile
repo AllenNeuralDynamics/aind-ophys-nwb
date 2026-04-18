@@ -17,8 +17,8 @@ RUN pip install -U --no-cache-dir \
     matplotlib \
     pandas \
     h5py \
-    hdmf==3.14.5 \
-    hdmf_zarr==0.11.0 \
+    hdmf \
+    pip install git+https://github.com/hdmf-dev/hdmf-zarr.git@zarr-v3-migratio \
 	pynwb==2.8.3 \
     tifffile \
     imageio \
