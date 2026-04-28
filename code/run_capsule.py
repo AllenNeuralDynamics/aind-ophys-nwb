@@ -1,11 +1,9 @@
 import argparse
 import fnmatch
-import glob
 import json
 import logging
 import os
 from collections import defaultdict
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import List, Tuple, Union
@@ -47,6 +45,12 @@ class SegmentationApproach(Enum):
         "description": "Suite2p's activity-based ROI detection using "
         "'sparse mode''",
     }
+
+
+class SessionType(Enum):
+    MULTIPLANE = "multiplane"
+    SINGLE_PLANE_WITH_EPOCHS = "single_plane_with_epochs"
+    SINGLE_PLANE = "single_plane"
 
 
 def load_pynwb_extension(path):
@@ -1193,6 +1197,51 @@ def find_latest_raw_folder(input_directory: Path) -> Path:
     )
 
 
+def find_epoch_locations(processed_path: Path) -> "Path | None":
+    """Locate an epoch_locations.json file under the processed folder.
+
+    Parameters
+    ----------
+    processed_path : Path
+        The processed-data root for the session.
+
+    Returns
+    -------
+    Path or None
+        Path to the first epoch_locations.json found, or None if absent.
+    """
+    candidates = list(
+        processed_path.glob("*/motion_correction/epoch_locations.json")
+    )
+    candidates += list(processed_path.glob("epoch_locations.json"))
+    return candidates[0] if candidates else None
+
+
+def detect_session_type(
+    data_description: dict, processed_path: Path
+) -> SessionType:
+    """Classify a session based on platform and presence of epoch_locations.
+
+    Parameters
+    ----------
+    data_description : dict
+        Parsed contents of data_description.json.
+    processed_path : Path
+        The processed-data root for the session.
+
+    Returns
+    -------
+    SessionType
+        One of MULTIPLANE, SINGLE_PLANE_WITH_EPOCHS, or SINGLE_PLANE.
+    """
+    platform = data_description.get("platform", {}).get("abbreviation")
+    if platform != "single-plane-ophys":
+        return SessionType.MULTIPLANE
+    if find_epoch_locations(processed_path) is not None:
+        return SessionType.SINGLE_PLANE_WITH_EPOCHS
+    return SessionType.SINGLE_PLANE
+
+
 def sync_times_to_multiplane_fovs(
     ophys_fovs: list, sync_timestamps: np.array
 ) -> list:
@@ -1510,25 +1559,17 @@ if __name__ == "__main__":
     input_directory = Path(args.input_directory)
     output_directory = Path(args.output_directory)
 
-    single_plane = False
-    multiplane = False
-
     # Load data description
     json_path = next(input_directory.rglob("data_description.json"))
     with open(json_path, "r") as f:
         data_description = json.load(f)
 
-    if (
-        data_description.get("platform", {}).get("abbreviation")
-        == "single-plane-ophys"
-    ):
-        single_plane = True
-    else:
-        multiplane = True
-
     # Get processed and raw paths
     raw_data_fp = input_directory / "raw"
     processed_data_fp = input_directory / "processed"
+
+    session_type = detect_session_type(data_description, processed_data_fp)
+    logging.info(f"Detected session type: {session_type.value}")
 
     # Pull session, subject, rig, and procedures metadata
     session_data, subject_data, rig_data, procedures_data = get_metadata(
@@ -1540,48 +1581,19 @@ if __name__ == "__main__":
         ophys_fovs = session_data["data_streams"][0]["ophys_fovs"]
 
     file_paths = get_processed_file_paths(
-        processed_data_fp, raw_data_fp, ophys_fovs, single_plane
+        processed_data_fp,
+        raw_data_fp,
+        ophys_fovs,
+        single_plane=session_type != SessionType.MULTIPLANE,
     )
 
     # Create a new NWB file using aind-nwb-utils
     nwb_file = nwb_utils.create_base_nwb_file(raw_data_fp)
 
-    # Generate a timestamped output filename
-    current_time = datetime.now()
-    formatted_date = current_time.strftime("%Y-%m-%d")
-    formatted_time = current_time.strftime("%H-%M-%S")
     output_nwb_fp = output_directory / "pophys.nwb.zarr"
+    io = NWBZarrIO(str(output_nwb_fp), "w")
 
-    # Choose IO class
-    io_class = NWBZarrIO
-    io = io_class(str(output_nwb_fp), "w")  # Write mode for a new file
-
-    # Single-plane processing
-    if single_plane:
-        session_json_path = raw_data_fp / "session.json"
-        with open(session_json_path, "r") as f:
-            session_json = json.load(f)
-        frame_rate = get_frame_rate(session_json)
-
-        paths = glob.glob(
-            str(processed_data_fp / "*/motion_correction/epoch_locations.json")
-        ) + glob.glob(str(processed_data_fp / "epoch_locations.json"))
-        sp_interval_path = paths[0] if paths else None
-
-        nwb_file = add_intervals_sp_nwb(sp_interval_path, frame_rate, nwb_file)
-
-        nwb_file = nwb_ophys_single_plane(
-            nwb_file,
-            file_paths,
-            rig_data,
-            session_data,
-            subject_data,
-            procedures_data,
-            frame_rate,
-        )
-
-    # Multiplane processing
-    elif multiplane:
+    if session_type == SessionType.MULTIPLANE:
         sync_timestamps = get_sync_timestamps(raw_data_fp)
         ophys_fovs = sync_times_to_multiplane_fovs(ophys_fovs, sync_timestamps)
 
@@ -1609,6 +1621,22 @@ if __name__ == "__main__":
                 field_of_view_height=str(fov["fov_height"]),
             )
             nwb_file.add_lab_meta_data(plane_metadata)
+    else:
+        frame_rate = get_frame_rate(session_data)
+
+        if session_type == SessionType.SINGLE_PLANE_WITH_EPOCHS:
+            epoch_path = find_epoch_locations(processed_data_fp)
+            nwb_file = add_intervals_sp_nwb(epoch_path, frame_rate, nwb_file)
+
+        nwb_file = nwb_ophys_single_plane(
+            nwb_file,
+            file_paths,
+            rig_data,
+            session_data,
+            subject_data,
+            procedures_data,
+            frame_rate,
+        )
 
     # Write out the NWB file
     output_directory.mkdir(parents=True, exist_ok=True)
