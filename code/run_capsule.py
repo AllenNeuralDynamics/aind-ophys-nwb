@@ -482,11 +482,7 @@ def nwb_ophys_single_plane(
         imaging_rate=frame_rate,
         description="2-photon imaging plane",
         device=device,
-        excitation_lambda=float(
-            session_json_data["data_streams"][0]["light_sources"][0][
-                "wavelength"
-            ]
-        ),
+        excitation_lambda=get_excitation_wavelength(session_json_data),
         indicator=injection,
         location=location,
         unit="",
@@ -1504,6 +1500,26 @@ def get_ophys_fovs(session: dict) -> list:
         if stream.get("ophys_fovs"):
             return stream["ophys_fovs"]
     return []
+
+
+def get_excitation_wavelength(session: dict) -> float:
+    """Return the first light source wavelength found in data_streams.
+
+    Parameters
+    ----------
+    session : dict
+        Parsed session.json contents.
+
+    Returns
+    -------
+    float
+        Wavelength in nm, or NaN if no data_stream has a light_sources entry.
+    """
+    for stream in session.get("data_streams", []):
+        light_sources = stream.get("light_sources")
+        if light_sources:
+            return float(light_sources[0]["wavelength"])
+    return float("nan")
 
 
 def get_frame_rate(session: dict):
