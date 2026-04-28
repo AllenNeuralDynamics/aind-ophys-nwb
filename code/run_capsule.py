@@ -421,7 +421,6 @@ def nwb_ophys_single_plane(
     file_paths: dict,
     rig_json_data: dict,
     session_json_data: dict,
-    subject_json_data: dict,
     procedures_json_data: dict,
     frame_rate: float,
 ) -> Tuple[pynwb.NWBFile, dict]:
@@ -438,8 +437,6 @@ def nwb_ophys_single_plane(
         The rig metadata
     session_json_data : dict
         The session metadata
-    subject_json_data : dict
-        The subject metadata
     procedures_json_data : dict
         The subject metadata
     frame_rate : float
@@ -1639,7 +1636,6 @@ if __name__ == "__main__":
             file_paths,
             rig_data,
             session_data,
-            subject_data,
             procedures_data,
             frame_rate,
         )
