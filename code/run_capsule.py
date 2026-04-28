@@ -459,24 +459,12 @@ def nwb_ophys_single_plane(
     # Get the single plane name from file_paths
     plane_name = list(file_paths["planes"].keys())[0]
     logging.info(f"Processing single plane: {plane_name}")
-    structure = str(
-        session_json_data["data_streams"][1]["ophys_fovs"][0][
-            "targeted_structure"
-        ]
-    )
-    imaging_depth = str(
-        session_json_data["data_streams"][1]["ophys_fovs"][0]["imaging_depth"]
-    )
-    step_unit = str(
-        session_json_data["data_streams"][1]["ophys_fovs"][0][
-            "fov_scale_factor_unit"
-        ]
-    )
-    imaging_depth_unit = str(
-        session_json_data["data_streams"][1]["ophys_fovs"][0][
-            "imaging_depth_unit"
-        ]
-    )
+
+    ophys_fov = get_ophys_fovs(session_json_data)[0]
+    structure = str(ophys_fov["targeted_structure"])
+    imaging_depth = str(ophys_fov["imaging_depth"])
+    step_unit = str(ophys_fov["fov_scale_factor_unit"])
+    imaging_depth_unit = str(ophys_fov["imaging_depth_unit"])
 
     # Create imaging plane with appropriate metadata
     location = (
@@ -1502,6 +1490,25 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
     return nwbfile
 
 
+def get_ophys_fovs(session: dict) -> list:
+    """Return the ophys_fovs list from whichever data_stream contains it.
+
+    Parameters
+    ----------
+    session : dict
+        Parsed session.json contents.
+
+    Returns
+    -------
+    list
+        The ophys_fovs list, or an empty list if no data_stream has one.
+    """
+    for stream in session.get("data_streams", []):
+        if stream.get("ophys_fovs"):
+            return stream["ophys_fovs"]
+    return []
+
+
 def get_frame_rate(session: dict):
     """Attempt to pull frame rate from session.json
     Returns none if frame rate not in session.json
@@ -1516,11 +1523,10 @@ def get_frame_rate(session: dict):
     frame_rate: float
         frame rate in Hz
     """
-    frame_rate_hz = None
-    for i in session.get("data_streams", ""):
-        if i.get("ophys_fovs", ""):
-            frame_rate_hz = i["ophys_fovs"][0]["frame_rate"]
-            break
+    fovs = get_ophys_fovs(session)
+    if not fovs:
+        return None
+    frame_rate_hz = fovs[0]["frame_rate"]
     if isinstance(frame_rate_hz, str):
         frame_rate_hz = float(frame_rate_hz)
     return frame_rate_hz
