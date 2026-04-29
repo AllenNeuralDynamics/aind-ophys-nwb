@@ -421,7 +421,6 @@ def nwb_ophys_single_plane(
     file_paths: dict,
     rig_json_data: dict,
     session_json_data: dict,
-    subject_json_data: dict,
     procedures_json_data: dict,
     frame_rate: float,
 ) -> Tuple[pynwb.NWBFile, dict]:
@@ -438,8 +437,6 @@ def nwb_ophys_single_plane(
         The rig metadata
     session_json_data : dict
         The session metadata
-    subject_json_data : dict
-        The subject metadata
     procedures_json_data : dict
         The subject metadata
     frame_rate : float
@@ -459,24 +456,12 @@ def nwb_ophys_single_plane(
     # Get the single plane name from file_paths
     plane_name = list(file_paths["planes"].keys())[0]
     logging.info(f"Processing single plane: {plane_name}")
-    structure = str(
-        session_json_data["data_streams"][1]["ophys_fovs"][0][
-            "targeted_structure"
-        ]
-    )
-    imaging_depth = str(
-        session_json_data["data_streams"][1]["ophys_fovs"][0]["imaging_depth"]
-    )
-    step_unit = str(
-        session_json_data["data_streams"][1]["ophys_fovs"][0][
-            "fov_scale_factor_unit"
-        ]
-    )
-    imaging_depth_unit = str(
-        session_json_data["data_streams"][1]["ophys_fovs"][0][
-            "imaging_depth_unit"
-        ]
-    )
+
+    ophys_fov = get_ophys_fovs(session_json_data)[0]
+    structure = str(ophys_fov["targeted_structure"])
+    imaging_depth = str(ophys_fov["imaging_depth"])
+    step_unit = str(ophys_fov["fov_scale_factor_unit"])
+    imaging_depth_unit = str(ophys_fov["imaging_depth_unit"])
 
     # Create imaging plane with appropriate metadata
     location = (
@@ -497,11 +482,7 @@ def nwb_ophys_single_plane(
         imaging_rate=frame_rate,
         description="2-photon imaging plane",
         device=device,
-        excitation_lambda=float(
-            session_json_data["data_streams"][0]["light_sources"][0][
-                "wavelength"
-            ]
-        ),
+        excitation_lambda=get_excitation_wavelength(session_json_data),
         indicator=injection,
         location=location,
         unit="",
@@ -1502,6 +1483,45 @@ def add_intervals_sp_nwb(json_path, frame_rate, nwbfile):
     return nwbfile
 
 
+def get_ophys_fovs(session: dict) -> list:
+    """Return the ophys_fovs list from whichever data_stream contains it.
+
+    Parameters
+    ----------
+    session : dict
+        Parsed session.json contents.
+
+    Returns
+    -------
+    list
+        The ophys_fovs list, or an empty list if no data_stream has one.
+    """
+    for stream in session.get("data_streams", []):
+        if stream.get("ophys_fovs"):
+            return stream["ophys_fovs"]
+    return []
+
+
+def get_excitation_wavelength(session: dict) -> float:
+    """Return the first light source wavelength found in data_streams.
+
+    Parameters
+    ----------
+    session : dict
+        Parsed session.json contents.
+
+    Returns
+    -------
+    float
+        Wavelength in nm, or NaN if no data_stream has a light_sources entry.
+    """
+    for stream in session.get("data_streams", []):
+        light_sources = stream.get("light_sources")
+        if light_sources:
+            return float(light_sources[0]["wavelength"])
+    return float("nan")
+
+
 def get_frame_rate(session: dict):
     """Attempt to pull frame rate from session.json
     Returns none if frame rate not in session.json
@@ -1516,11 +1536,10 @@ def get_frame_rate(session: dict):
     frame_rate: float
         frame rate in Hz
     """
-    frame_rate_hz = None
-    for i in session.get("data_streams", ""):
-        if i.get("ophys_fovs", ""):
-            frame_rate_hz = i["ophys_fovs"][0]["frame_rate"]
-            break
+    fovs = get_ophys_fovs(session)
+    if not fovs:
+        return None
+    frame_rate_hz = fovs[0]["frame_rate"]
     if isinstance(frame_rate_hz, str):
         frame_rate_hz = float(frame_rate_hz)
     return frame_rate_hz
@@ -1633,7 +1652,6 @@ if __name__ == "__main__":
             file_paths,
             rig_data,
             session_data,
-            subject_data,
             procedures_data,
             frame_rate,
         )
