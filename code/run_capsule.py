@@ -32,6 +32,7 @@ from pynwb.ophys import (
     OpticalChannel,
     RoiResponseSeries,
 )
+from aind_metadata_manager.utils import get_major_schema_version, get_compatible_frame_rate
 
 
 class SegmentationApproach(Enum):
@@ -834,11 +835,7 @@ def nwb_ophys(
             imaging_rate=float(plane["frame_rate"]),
             description="Two-photon imaging plane",
             device=device,
-            excitation_lambda=float(
-                session_json_data["data_streams"][0]["light_sources"][0][
-                    "wavelength"
-                ]
-            ),
+            excitation_lambda=get_excitation_wavelength(session_json_data),
             indicator=subject_json_data["genotype"],
             location=location,
             grid_spacing=[
@@ -1522,24 +1519,81 @@ def get_excitation_wavelength(session: dict) -> float:
     return float("nan")
 
 
-def get_frame_rate(session: dict):
-    """Attempt to pull frame rate from session.json
-    Returns none if frame rate not in session.json
+def get_schema_major_version(data_description: dict) -> str:
+    """Determine aind-data-schema major version from data_description.json.
 
     Parameters
     ----------
-    session: dict
-        session metadata
+    data_description: dict
+        parsed contents of data_description.json
+
+    Returns
+    -------
+    version: str
+        "v2" if schema_version starts with "2.", "v1" otherwise (including missing).
+    """
+    schema_version = data_description.get("schema_version", "") or ""
+    if schema_version.startswith("2."):
+        return "v2"
+    return "v1"
+
+
+def get_acquisition_metadata(input_dir: Path, version: str) -> dict:
+    """Load acquisition.json (aind-data-schema v2) or session.json (v1).
+
+    Parameters
+    ----------
+    input_dir: Path
+        input directory
+    version: str
+        "v2" → load acquisition.json, "v1" → load session.json
+
+    Returns
+    -------
+    metadata: dict
+        parsed json contents
+    """
+    filename = "acquisition.json" if version == "v2" else "session.json"
+    return get_metadata(input_dir, filename)
+
+
+def get_frame_rate(metadata: dict, version: str) -> float:
+    """Attempt to pull frame rate from session.json (v1) or acquisition.json (v2).
+
+    v1 path: data_streams[i].ophys_fovs[0].frame_rate
+    v2 path: data_streams[i].configurations[j].sampling_strategy.frame_rate
+
+    Raises ValueError if frame rate is not found.
+
+    Parameters
+    ----------
+    metadata: dict
+        session (v1) or acquisition (v2) metadata
+    version: str
+        "v1" or "v2"
 
     Returns
     -------
     frame_rate: float
         frame rate in Hz
     """
-    fovs = get_ophys_fovs(session)
-    if not fovs:
-        return None
-    frame_rate_hz = fovs[0]["frame_rate"]
+    frame_rate_hz = None
+    if version == "v2":
+        for stream in metadata.get("data_streams", []):
+            for config in stream.get("configurations", []):
+                sampling = config.get("sampling_strategy")
+                if sampling and sampling.get("frame_rate") is not None:
+                    frame_rate_hz = sampling["frame_rate"]
+                    break
+            if frame_rate_hz is not None:
+                break
+    else:
+        for stream in metadata.get("data_streams", []):
+            if stream.get("ophys_fovs"):
+                frame_rate_hz = stream["ophys_fovs"][0]["frame_rate"]
+                break
+    if frame_rate_hz is None:
+        raise ValueError(f"No frame rate found in {version} acquisition metadata")
     if isinstance(frame_rate_hz, str):
         frame_rate_hz = float(frame_rate_hz)
     return frame_rate_hz
@@ -1582,6 +1636,10 @@ if __name__ == "__main__":
     json_path = next(input_directory.rglob("data_description.json"))
     with open(json_path, "r") as f:
         data_description = json.load(f)
+
+    # Determine schema version and load acquisition metadata
+    schema_version = get_schema_major_version(data_description)
+    acquisition_data = get_acquisition_metadata(input_directory, schema_version)
 
     # Get processed and raw paths
     raw_data_fp = input_directory / "raw"
@@ -1641,7 +1699,7 @@ if __name__ == "__main__":
             )
             nwb_file.add_lab_meta_data(plane_metadata)
     else:
-        frame_rate = get_frame_rate(session_data)
+        frame_rate = get_frame_rate(acquisition_data, schema_version)
 
         if session_type == SessionType.SINGLE_PLANE_WITH_EPOCHS:
             epoch_path = find_epoch_locations(processed_data_fp)
