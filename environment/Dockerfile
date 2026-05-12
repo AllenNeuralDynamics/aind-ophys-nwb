@@ -26,7 +26,9 @@ RUN pip install -U --no-cache-dir \
     aind-nwb-utils==0.1.6\
     numpy==1.26.4 \
     sparse \
-    aind-metadata-manager>=0.2.0,<1.0.0
+    aind-metadata-manager>=0.2.0,<1.0.0 \
+    watchtower==3.4.0 \
+    pyyaml==6.0.3 
 
 # install versions for github copilot
 ADD "https://github.com/coder/code-server/releases/download/v4.21.1/code-server-4.21.1-linux-amd64.tar.gz" /.code-server/code-server.tar.gz
