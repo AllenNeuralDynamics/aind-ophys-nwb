@@ -11,9 +11,9 @@
 #   level           - maps to record.levelname
 #   message         - maps to record.getMessage()
 #
-# The formatter and filter classes live in aind_formatters.py (same folder).
+# The formatter and filter classes live in logging_util.py (same folder).
 # Load this file with yaml.safe_load() and pass the result to
-# logging.config.dictConfig() — see example_script.py.
+# logging.config.dictConfig() — see logging_util.setup_logging().
 
 version: 1
 disable_existing_loggers: false
@@ -21,7 +21,7 @@ disable_existing_loggers: false
 formatters:
   aind_json:
     # () tells dictConfig to instantiate this class directly
-    (): aind_logging.AindJsonFormatter
+    (): logging_util.AindJsonFormatter
     fields:
       - timestamp
       - level
@@ -33,7 +33,7 @@ formatters:
 
 filters:
   aind_fields:
-    (): aind_logging.AindContextFilter
+    (): logging_util.AindContextFilter
     # Override these values at runtime in example_script.py before calling
     # dictConfig, or update the filter object after setup.
     acquisition_name: "undefined"
