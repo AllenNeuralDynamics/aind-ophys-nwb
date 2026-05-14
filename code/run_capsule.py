@@ -34,6 +34,8 @@ from pynwb.ophys import (
 )
 from aind_metadata_manager.utils import get_major_schema_version, get_compatible_frame_rate
 
+from logging_util import setup_logging
+
 
 class SegmentationApproach(Enum):
     SUITE2P_ANATOMICAL = {
@@ -1636,7 +1638,14 @@ if __name__ == "__main__":
     json_path = next(input_directory.rglob("data_description.json"))
     with open(json_path, "r") as f:
         data_description = json.load(f)
-
+    process_name = os.getenv("PROCESS_NAME")
+    asset_name = data_description.get("name")
+    setup_logging(
+        process_name,
+        acquisition_name=asset_name,
+        process_name=process_name,
+        pipeline_name=os.getenv("PIPELINE_NAME", "")
+    )
     # Determine schema version and load acquisition metadata
     schema_version = get_schema_major_version(data_description)
     acquisition_data = get_acquisition_metadata(input_directory, schema_version)
