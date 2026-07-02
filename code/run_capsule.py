@@ -509,56 +509,81 @@ def nwb_ophys_single_plane(
 
     # Create plane segmentation
     try:
-        # Try to load classifier data
+        # Try to load classifier (ROICaT) data
         soma_predictions = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="soma",
-            h5_key="predictions",
+            h5_key="roicat_predictions",
         )
         soma_probabilities = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="soma",
-            h5_key="probabilities",
+            h5_key="roicat_probabilities",
         )
         dendrite_predictions = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="dendrites",
-            h5_key="predictions",
+            h5_key="roicat_predictions",
         )
         dendrite_probabilities = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="dendrites",
-            h5_key="probabilities",
+            h5_key="roicat_probabilities",
         )
+
+        # Per-ROI cellpose probability from the extraction file. Only
+        # present when segmentation ran cellpose; when absent (e.g.
+        # activity-based segmentation) the column is still created but
+        # filled with NaN, so the roi_table schema stays consistent.
+        try:
+            cellpose_soma_probability = load_generic_group(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                h5_group="rois",
+                h5_key="cellpose_soma_probability",
+            )
+        except Exception:
+            cellpose_soma_probability = None
+
+        columns = [
+            VectorData(
+                name="roicat_is_soma",
+                description="ROICaT soma predictions",
+            ),
+            VectorData(
+                name="roicat_soma_probability",
+                description="ROICaT soma probabilities",
+            ),
+            VectorData(
+                name="roicat_is_dendrite",
+                description="ROICaT dendrite predictions",
+            ),
+            VectorData(
+                name="roicat_dendrite_probability",
+                description="ROICaT dendrite probabilities",
+            ),
+            VectorData(
+                name="cellpose_soma_probability",
+                description=(
+                    "Mean cellpose cell-probability under each ROI "
+                    "footprint (probability in [0, 1]); NaN when "
+                    "cellpose segmentation was not run"
+                ),
+            ),
+        ]
+        colnames = [
+            "roicat_is_soma",
+            "roicat_soma_probability",
+            "roicat_is_dendrite",
+            "roicat_dendrite_probability",
+            "cellpose_soma_probability",
+        ]
 
         plane_segmentation = img_seg.create_plane_segmentation(
             name="roi_table",
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
-            columns=[
-                VectorData(
-                    name="is_soma",
-                    description="Soma predictions",
-                ),
-                VectorData(
-                    name="soma_probability",
-                    description="Soma probabilities",
-                ),
-                VectorData(
-                    name="is_dendrite",
-                    description="Dendrite predictions",
-                ),
-                VectorData(
-                    name="dendrite_probability",
-                    description="Dendrite probabilities",
-                ),
-            ],
-            colnames=[
-                "is_soma",
-                "soma_probability",
-                "is_dendrite",
-                "dendrite_probability",
-            ],
+            columns=columns,
+            colnames=colnames,
         )
 
         for idx, pixel_mask in enumerate(
@@ -566,12 +591,17 @@ def nwb_ophys_single_plane(
                 file_paths["planes"][plane_name]["extraction_h5"]
             )
         ):
+            if cellpose_soma_probability is not None:
+                cellpose_value = cellpose_soma_probability[idx]
+            else:
+                cellpose_value = np.nan
             plane_segmentation.add_roi(
                 image_mask=pixel_mask,
-                is_soma=soma_predictions[idx],
-                soma_probability=soma_probabilities[idx][-1],
-                is_dendrite=dendrite_predictions[idx],
-                dendrite_probability=dendrite_probabilities[idx][-1],
+                roicat_is_soma=soma_predictions[idx],
+                roicat_soma_probability=soma_probabilities[idx][-1],
+                roicat_is_dendrite=dendrite_predictions[idx],
+                roicat_dendrite_probability=dendrite_probabilities[idx][-1],
+                cellpose_soma_probability=cellpose_value,
             )
     except Exception as e:
         logging.warning(f"Error adding ROIs with classifier data: {e}")
@@ -858,51 +888,77 @@ def nwb_ophys(
         soma_predictions = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="soma",
-            h5_key="predictions",
+            h5_key="roicat_predictions",
         )
         soma_probabilities = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="soma",
-            h5_key="probabilities",
+            h5_key="roicat_probabilities",
         )
         dendrite_predictions = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="dendrites",
-            h5_key="predictions",
+            h5_key="roicat_predictions",
         )
         dendrite_probabilities = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="dendrites",
-            h5_key="probabilities",
+            h5_key="roicat_probabilities",
         )
+
+        # Per-ROI cellpose probability from the extraction file. Only
+        # present when segmentation ran cellpose; when absent (e.g.
+        # activity-based segmentation) the column is still created but
+        # filled with NaN, so the roi_table schema stays consistent.
+        try:
+            cellpose_soma_probability = load_generic_group(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                h5_group="rois",
+                h5_key="cellpose_soma_probability",
+            )
+        except Exception:
+            cellpose_soma_probability = None
+
+        columns = [
+            VectorData(
+                name="roicat_is_soma",
+                description="ROICaT soma predictions",
+            ),
+            VectorData(
+                name="roicat_soma_probability",
+                description="ROICaT soma probabilities",
+            ),
+            VectorData(
+                name="roicat_is_dendrite",
+                description="ROICaT dendrite predictions",
+            ),
+            VectorData(
+                name="roicat_dendrite_probability",
+                description="ROICaT dendrite probabilities",
+            ),
+            VectorData(
+                name="cellpose_soma_probability",
+                description=(
+                    "Mean cellpose cell-probability under each ROI "
+                    "footprint (probability in [0, 1]); NaN when "
+                    "cellpose segmentation was not run"
+                ),
+            ),
+        ]
+        colnames = [
+            "roicat_is_soma",
+            "roicat_soma_probability",
+            "roicat_is_dendrite",
+            "roicat_dendrite_probability",
+            "cellpose_soma_probability",
+        ]
+
         plane_segmentation = img_seg.create_plane_segmentation(
             name="roi_table",
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
-            columns=[
-                VectorData(
-                    name="is_soma",
-                    description="Soma predictions",
-                ),
-                VectorData(
-                    name="soma_probability",
-                    description="Soma probabilities",
-                ),
-                VectorData(
-                    name="is_dendrite",
-                    description="Dendrite predictions",
-                ),
-                VectorData(
-                    name="dendrite_probability",
-                    description="Dendrite probabilities",
-                ),
-            ],
-            colnames=[
-                "is_soma",
-                "soma_probability",
-                "is_dendrite",
-                "dendrite_probability",
-            ],
+            columns=columns,
+            colnames=colnames,
         )
 
         neuropil_img = None
@@ -983,16 +1039,18 @@ def nwb_ophys(
                 file_paths["planes"][plane_name]["extraction_h5"]
             )
         ):
+            if cellpose_soma_probability is not None:
+                cellpose_value = cellpose_soma_probability[idx]
+            else:
+                cellpose_value = np.nan
             plane_segmentation.add_roi(
                 image_mask=pixel_mask,
-                is_soma=soma_predictions[idx],
-                soma_probability=soma_probabilities[idx][
-                    -1
-                ],  # last element is the probability
-                is_dendrite=dendrite_predictions[idx],
-                dendrite_probability=dendrite_probabilities[idx][
-                    -1
-                ],  # last element is the probability
+                roicat_is_soma=soma_predictions[idx],
+                # last element is the probability
+                roicat_soma_probability=soma_probabilities[idx][-1],
+                roicat_is_dendrite=dendrite_predictions[idx],
+                roicat_dendrite_probability=dendrite_probabilities[idx][-1],
+                cellpose_soma_probability=cellpose_value,
             )
 
         roi_traces, roi_names = load_signals(
