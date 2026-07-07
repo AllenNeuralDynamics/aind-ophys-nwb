@@ -34,6 +34,17 @@ from pynwb.ophys import (
 )
 
 
+# Per-ROI suite2p morphology stats to surface from the extraction file's
+# rois/ group into the NWB roi_table (as suite2p_* columns).
+SUITE2P_ROI_STATS = (
+    "aspect_ratio",
+    "compact",
+    "solidity",
+    "radius",
+    "footprint",
+)
+
+
 class SegmentationApproach(Enum):
     SUITE2P_ANATOMICAL = {
         "method": "suite2p-cellpose",
@@ -509,26 +520,26 @@ def nwb_ophys_single_plane(
 
     # Create plane segmentation
     try:
-        # Try to load classifier (ROICaT) data
+        # Try to load classifier data
         soma_predictions = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="soma",
-            h5_key="roicat_predictions",
+            h5_key="predictions",
         )
         soma_probabilities = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="soma",
-            h5_key="roicat_probabilities",
+            h5_key="probabilities",
         )
         dendrite_predictions = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="dendrites",
-            h5_key="roicat_predictions",
+            h5_key="predictions",
         )
         dendrite_probabilities = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="dendrites",
-            h5_key="roicat_probabilities",
+            h5_key="probabilities",
         )
 
         # Per-ROI cellpose probability from the extraction file. Only
@@ -544,22 +555,33 @@ def nwb_ophys_single_plane(
         except Exception:
             cellpose_soma_probability = None
 
+        # Per-ROI suite2p morphology stats (always present in the
+        # extraction file's rois/ group).
+        suite2p_stats = {
+            stat: load_generic_group(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                h5_group="rois",
+                h5_key=stat,
+            )
+            for stat in SUITE2P_ROI_STATS
+        }
+
         columns = [
             VectorData(
-                name="roicat_is_soma",
-                description="ROICaT soma predictions",
+                name="is_soma",
+                description="Soma predictions",
             ),
             VectorData(
-                name="roicat_soma_probability",
-                description="ROICaT soma probabilities",
+                name="soma_probability",
+                description="Soma probabilities",
             ),
             VectorData(
-                name="roicat_is_dendrite",
-                description="ROICaT dendrite predictions",
+                name="is_dendrite",
+                description="Dendrite predictions",
             ),
             VectorData(
-                name="roicat_dendrite_probability",
-                description="ROICaT dendrite probabilities",
+                name="dendrite_probability",
+                description="Dendrite probabilities",
             ),
             VectorData(
                 name="cellpose_soma_probability",
@@ -571,12 +593,20 @@ def nwb_ophys_single_plane(
             ),
         ]
         colnames = [
-            "roicat_is_soma",
-            "roicat_soma_probability",
-            "roicat_is_dendrite",
-            "roicat_dendrite_probability",
+            "is_soma",
+            "soma_probability",
+            "is_dendrite",
+            "dendrite_probability",
             "cellpose_soma_probability",
         ]
+        for stat in SUITE2P_ROI_STATS:
+            columns.append(
+                VectorData(
+                    name=stat,
+                    description=f"suite2p ROI stat: {stat}",
+                )
+            )
+            colnames.append(stat)
 
         plane_segmentation = img_seg.create_plane_segmentation(
             name="roi_table",
@@ -597,11 +627,15 @@ def nwb_ophys_single_plane(
                 cellpose_value = np.nan
             plane_segmentation.add_roi(
                 image_mask=pixel_mask,
-                roicat_is_soma=soma_predictions[idx],
-                roicat_soma_probability=soma_probabilities[idx][-1],
-                roicat_is_dendrite=dendrite_predictions[idx],
-                roicat_dendrite_probability=dendrite_probabilities[idx][-1],
+                is_soma=soma_predictions[idx],
+                soma_probability=soma_probabilities[idx][-1],
+                is_dendrite=dendrite_predictions[idx],
+                dendrite_probability=dendrite_probabilities[idx][-1],
                 cellpose_soma_probability=cellpose_value,
+                **{
+                    stat: suite2p_stats[stat][idx]
+                    for stat in SUITE2P_ROI_STATS
+                },
             )
     except Exception as e:
         logging.warning(f"Error adding ROIs with classifier data: {e}")
@@ -888,22 +922,22 @@ def nwb_ophys(
         soma_predictions = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="soma",
-            h5_key="roicat_predictions",
+            h5_key="predictions",
         )
         soma_probabilities = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="soma",
-            h5_key="roicat_probabilities",
+            h5_key="probabilities",
         )
         dendrite_predictions = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="dendrites",
-            h5_key="roicat_predictions",
+            h5_key="predictions",
         )
         dendrite_probabilities = load_generic_group(
             file_paths["planes"][plane_name]["classifier_h5"],
             h5_group="dendrites",
-            h5_key="roicat_probabilities",
+            h5_key="probabilities",
         )
 
         # Per-ROI cellpose probability from the extraction file. Only
@@ -919,22 +953,33 @@ def nwb_ophys(
         except Exception:
             cellpose_soma_probability = None
 
+        # Per-ROI suite2p morphology stats (always present in the
+        # extraction file's rois/ group).
+        suite2p_stats = {
+            stat: load_generic_group(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                h5_group="rois",
+                h5_key=stat,
+            )
+            for stat in SUITE2P_ROI_STATS
+        }
+
         columns = [
             VectorData(
-                name="roicat_is_soma",
-                description="ROICaT soma predictions",
+                name="is_soma",
+                description="Soma predictions",
             ),
             VectorData(
-                name="roicat_soma_probability",
-                description="ROICaT soma probabilities",
+                name="soma_probability",
+                description="Soma probabilities",
             ),
             VectorData(
-                name="roicat_is_dendrite",
-                description="ROICaT dendrite predictions",
+                name="is_dendrite",
+                description="Dendrite predictions",
             ),
             VectorData(
-                name="roicat_dendrite_probability",
-                description="ROICaT dendrite probabilities",
+                name="dendrite_probability",
+                description="Dendrite probabilities",
             ),
             VectorData(
                 name="cellpose_soma_probability",
@@ -946,12 +991,20 @@ def nwb_ophys(
             ),
         ]
         colnames = [
-            "roicat_is_soma",
-            "roicat_soma_probability",
-            "roicat_is_dendrite",
-            "roicat_dendrite_probability",
+            "is_soma",
+            "soma_probability",
+            "is_dendrite",
+            "dendrite_probability",
             "cellpose_soma_probability",
         ]
+        for stat in SUITE2P_ROI_STATS:
+            columns.append(
+                VectorData(
+                    name=stat,
+                    description=f"suite2p ROI stat: {stat}",
+                )
+            )
+            colnames.append(stat)
 
         plane_segmentation = img_seg.create_plane_segmentation(
             name="roi_table",
@@ -1045,12 +1098,16 @@ def nwb_ophys(
                 cellpose_value = np.nan
             plane_segmentation.add_roi(
                 image_mask=pixel_mask,
-                roicat_is_soma=soma_predictions[idx],
+                is_soma=soma_predictions[idx],
                 # last element is the probability
-                roicat_soma_probability=soma_probabilities[idx][-1],
-                roicat_is_dendrite=dendrite_predictions[idx],
-                roicat_dendrite_probability=dendrite_probabilities[idx][-1],
+                soma_probability=soma_probabilities[idx][-1],
+                is_dendrite=dendrite_predictions[idx],
+                dendrite_probability=dendrite_probabilities[idx][-1],
                 cellpose_soma_probability=cellpose_value,
+                **{
+                    stat: suite2p_stats[stat][idx]
+                    for stat in SUITE2P_ROI_STATS
+                },
             )
 
         roi_traces, roi_names = load_signals(
