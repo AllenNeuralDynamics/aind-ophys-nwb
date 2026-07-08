@@ -34,6 +34,17 @@ from pynwb.ophys import (
 )
 
 
+# Per-ROI suite2p morphology stats to surface from the extraction file's
+# rois/ group into the NWB roi_table (as suite2p_* columns).
+SUITE2P_ROI_STATS = (
+    "aspect_ratio",
+    "compact",
+    "solidity",
+    "radius",
+    "footprint",
+)
+
+
 class SegmentationApproach(Enum):
     SUITE2P_ANATOMICAL = {
         "method": "suite2p-cellpose",
@@ -531,34 +542,78 @@ def nwb_ophys_single_plane(
             h5_key="probabilities",
         )
 
+        # Per-ROI cellpose probability from the extraction file. Only
+        # present when segmentation ran cellpose; when absent (e.g.
+        # activity-based segmentation) the column is still created but
+        # filled with NaN, so the roi_table schema stays consistent.
+        try:
+            cellpose_soma_probability = load_generic_group(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                h5_group="rois",
+                h5_key="cellpose_soma_probability",
+            )
+        except Exception:
+            cellpose_soma_probability = None
+
+        # Per-ROI suite2p morphology stats (always present in the
+        # extraction file's rois/ group).
+        suite2p_stats = {
+            stat: load_generic_group(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                h5_group="rois",
+                h5_key=stat,
+            )
+            for stat in SUITE2P_ROI_STATS
+        }
+
+        columns = [
+            VectorData(
+                name="is_soma",
+                description="Soma predictions",
+            ),
+            VectorData(
+                name="soma_probability",
+                description="Soma probabilities",
+            ),
+            VectorData(
+                name="is_dendrite",
+                description="Dendrite predictions",
+            ),
+            VectorData(
+                name="dendrite_probability",
+                description="Dendrite probabilities",
+            ),
+            VectorData(
+                name="cellpose_soma_probability",
+                description=(
+                    "Mean cellpose cell-probability under each ROI "
+                    "footprint (probability in [0, 1]); NaN when "
+                    "cellpose segmentation was not run"
+                ),
+            ),
+        ]
+        colnames = [
+            "is_soma",
+            "soma_probability",
+            "is_dendrite",
+            "dendrite_probability",
+            "cellpose_soma_probability",
+        ]
+        for stat in SUITE2P_ROI_STATS:
+            columns.append(
+                VectorData(
+                    name=stat,
+                    description=f"suite2p ROI stat: {stat}",
+                )
+            )
+            colnames.append(stat)
+
         plane_segmentation = img_seg.create_plane_segmentation(
             name="roi_table",
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
-            columns=[
-                VectorData(
-                    name="is_soma",
-                    description="Soma predictions",
-                ),
-                VectorData(
-                    name="soma_probability",
-                    description="Soma probabilities",
-                ),
-                VectorData(
-                    name="is_dendrite",
-                    description="Dendrite predictions",
-                ),
-                VectorData(
-                    name="dendrite_probability",
-                    description="Dendrite probabilities",
-                ),
-            ],
-            colnames=[
-                "is_soma",
-                "soma_probability",
-                "is_dendrite",
-                "dendrite_probability",
-            ],
+            columns=columns,
+            colnames=colnames,
         )
 
         for idx, pixel_mask in enumerate(
@@ -566,12 +621,21 @@ def nwb_ophys_single_plane(
                 file_paths["planes"][plane_name]["extraction_h5"]
             )
         ):
+            if cellpose_soma_probability is not None:
+                cellpose_value = cellpose_soma_probability[idx]
+            else:
+                cellpose_value = np.nan
             plane_segmentation.add_roi(
                 image_mask=pixel_mask,
                 is_soma=soma_predictions[idx],
                 soma_probability=soma_probabilities[idx][-1],
                 is_dendrite=dendrite_predictions[idx],
                 dendrite_probability=dendrite_probabilities[idx][-1],
+                cellpose_soma_probability=cellpose_value,
+                **{
+                    stat: suite2p_stats[stat][idx]
+                    for stat in SUITE2P_ROI_STATS
+                },
             )
     except Exception as e:
         logging.warning(f"Error adding ROIs with classifier data: {e}")
@@ -875,34 +939,79 @@ def nwb_ophys(
             h5_group="dendrites",
             h5_key="probabilities",
         )
+
+        # Per-ROI cellpose probability from the extraction file. Only
+        # present when segmentation ran cellpose; when absent (e.g.
+        # activity-based segmentation) the column is still created but
+        # filled with NaN, so the roi_table schema stays consistent.
+        try:
+            cellpose_soma_probability = load_generic_group(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                h5_group="rois",
+                h5_key="cellpose_soma_probability",
+            )
+        except Exception:
+            cellpose_soma_probability = None
+
+        # Per-ROI suite2p morphology stats (always present in the
+        # extraction file's rois/ group).
+        suite2p_stats = {
+            stat: load_generic_group(
+                file_paths["planes"][plane_name]["extraction_h5"],
+                h5_group="rois",
+                h5_key=stat,
+            )
+            for stat in SUITE2P_ROI_STATS
+        }
+
+        columns = [
+            VectorData(
+                name="is_soma",
+                description="Soma predictions",
+            ),
+            VectorData(
+                name="soma_probability",
+                description="Soma probabilities",
+            ),
+            VectorData(
+                name="is_dendrite",
+                description="Dendrite predictions",
+            ),
+            VectorData(
+                name="dendrite_probability",
+                description="Dendrite probabilities",
+            ),
+            VectorData(
+                name="cellpose_soma_probability",
+                description=(
+                    "Mean cellpose cell-probability under each ROI "
+                    "footprint (probability in [0, 1]); NaN when "
+                    "cellpose segmentation was not run"
+                ),
+            ),
+        ]
+        colnames = [
+            "is_soma",
+            "soma_probability",
+            "is_dendrite",
+            "dendrite_probability",
+            "cellpose_soma_probability",
+        ]
+        for stat in SUITE2P_ROI_STATS:
+            columns.append(
+                VectorData(
+                    name=stat,
+                    description=f"suite2p ROI stat: {stat}",
+                )
+            )
+            colnames.append(stat)
+
         plane_segmentation = img_seg.create_plane_segmentation(
             name="roi_table",
             description=plane_seg_approach + plane_seg_descr,
             imaging_plane=imaging_plane,
-            columns=[
-                VectorData(
-                    name="is_soma",
-                    description="Soma predictions",
-                ),
-                VectorData(
-                    name="soma_probability",
-                    description="Soma probabilities",
-                ),
-                VectorData(
-                    name="is_dendrite",
-                    description="Dendrite predictions",
-                ),
-                VectorData(
-                    name="dendrite_probability",
-                    description="Dendrite probabilities",
-                ),
-            ],
-            colnames=[
-                "is_soma",
-                "soma_probability",
-                "is_dendrite",
-                "dendrite_probability",
-            ],
+            columns=columns,
+            colnames=colnames,
         )
 
         neuropil_img = None
@@ -983,16 +1092,22 @@ def nwb_ophys(
                 file_paths["planes"][plane_name]["extraction_h5"]
             )
         ):
+            if cellpose_soma_probability is not None:
+                cellpose_value = cellpose_soma_probability[idx]
+            else:
+                cellpose_value = np.nan
             plane_segmentation.add_roi(
                 image_mask=pixel_mask,
                 is_soma=soma_predictions[idx],
-                soma_probability=soma_probabilities[idx][
-                    -1
-                ],  # last element is the probability
+                # last element is the probability
+                soma_probability=soma_probabilities[idx][-1],
                 is_dendrite=dendrite_predictions[idx],
-                dendrite_probability=dendrite_probabilities[idx][
-                    -1
-                ],  # last element is the probability
+                dendrite_probability=dendrite_probabilities[idx][-1],
+                cellpose_soma_probability=cellpose_value,
+                **{
+                    stat: suite2p_stats[stat][idx]
+                    for stat in SUITE2P_ROI_STATS
+                },
             )
 
         roi_traces, roi_names = load_signals(
