@@ -250,13 +250,9 @@ def load_available_suite2p_stats(extraction_h5: Path) -> dict:
         Mapping of stat name to its per-ROI array, for whichever stats
         are present.
     """
-    stats = {}
-    for stat in SUITE2P_ROI_STATS:
-        try:
-            stats[stat] = load_generic_group(extraction_h5, h5_group="rois", h5_key=stat)
-        except KeyError:
-            pass
-    return stats
+    with h5py.File(extraction_h5, "r") as f:
+        rois_group = f.get("rois", {})
+        return {stat: rois_group[stat][:] for stat in SUITE2P_ROI_STATS if stat in rois_group}
 
 
 def load_sparse_array(h5_file):
