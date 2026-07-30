@@ -1,0 +1,86 @@
+{
+	"version": 1,
+	"named_parameters": true,
+	"parameters": [
+		{
+			"id": "VscqGC0k9adomhei",
+			"name": "input_dir",
+			"param_name": "input_dir",
+			"description": "Directory holding the mounted inputs. Expected to contain a 'raw' subdirectory with the core acquisition metadata and a 'processed' subdirectory with every upstream capsule's output.",
+			"help_text": "Directory holding the mounted inputs. Expected to contain a 'raw' subdirectory with the core acquisition metadata and a 'processed' subdirectory with every upstream capsule's output.",
+			"type": "text",
+			"value_type": "string",
+			"default_value": "/data"
+		},
+		{
+			"id": "5NWdyUyGdoVC3Poa",
+			"name": "output_dir",
+			"param_name": "output_dir",
+			"description": "Directory where the NWB Zarr store and metadata are written.",
+			"help_text": "Directory where the NWB Zarr store and metadata are written.",
+			"type": "text",
+			"value_type": "string",
+			"default_value": "/results"
+		},
+		{
+			"id": "Jq09qQegAFVeQ6qp",
+			"name": "raw_subdir",
+			"param_name": "raw_subdir",
+			"description": "Name of the subdirectory of input_dir holding the raw asset (core metadata, sync file, pophys movies).",
+			"help_text": "Name of the subdirectory of input_dir holding the raw asset (core metadata, sync file, pophys movies).",
+			"type": "text",
+			"value_type": "string",
+			"default_value": "raw"
+		},
+		{
+			"id": "cVjgZJkKBIDMemht",
+			"name": "processed_subdir",
+			"param_name": "processed_subdir",
+			"description": "Name of the subdirectory of input_dir holding every upstream capsule's results.",
+			"help_text": "Name of the subdirectory of input_dir holding every upstream capsule's results.",
+			"type": "text",
+			"value_type": "string",
+			"default_value": "processed"
+		},
+		{
+			"id": "nbAEmeGFqALGS6yy",
+			"name": "nwb_name",
+			"param_name": "nwb_name",
+			"description": "Basename of the NWB Zarr store written inside output_dir. It is written into a subdirectory, never at the results root, so that the pipeline's basename-flattening publishDir cannot collide.",
+			"help_text": "Basename of the NWB Zarr store written inside output_dir. It is written into a subdirectory, never at the results root, so that the pipeline's basename-flattening publishDir cannot collide.",
+			"type": "text",
+			"value_type": "string",
+			"default_value": "pophys.nwb.zarr"
+		},
+		{
+			"id": "QbCFjDCsueaDAPIN",
+			"name": "extension_namespace",
+			"param_name": "extension_namespace",
+			"description": "Path to the ndx-aibs-behavior-ophys namespace YAML that defines the per-plane OphysMetadataSchema lab metadata. Resolved relative to the working directory (the capsule's code/ folder) when not absolute.",
+			"help_text": "Path to the ndx-aibs-behavior-ophys namespace YAML that defines the per-plane OphysMetadataSchema lab metadata. Resolved relative to the working directory (the capsule's code/ folder) when not absolute.",
+			"type": "text",
+			"value_type": "string",
+			"default_value": "ndx-aibs-behavior-ophys.namespace.yaml"
+		},
+		{
+			"id": "mbDy7boCqEOKxE2j",
+			"name": "skip_lab_metadata",
+			"param_name": "skip_lab_metadata",
+			"description": "Skip the ndx-aibs-behavior-ophys per-plane lab metadata. Use only when the extension YAML is unavailable; the resulting NWB omits imaging_depth / imaging_plane_group / field_of_view_*.",
+			"help_text": "Skip the ndx-aibs-behavior-ophys per-plane lab metadata. Use only when the extension YAML is unavailable; the resulting NWB omits imaging_depth / imaging_plane_group / field_of_view_*.",
+			"type": "text",
+			"value_type": "integer",
+			"default_value": "0"
+		},
+		{
+			"id": "eAGCScStWSuoMEQn",
+			"name": "verify",
+			"param_name": "verify",
+			"description": "Round-trip the emitted processing.json and quality_control.json through the core v2 schema objects, and re-open the NWB Zarr store, after writing.",
+			"help_text": "Round-trip the emitted processing.json and quality_control.json through the core v2 schema objects, and re-open the NWB Zarr store, after writing.",
+			"type": "text",
+			"value_type": "integer",
+			"default_value": "0"
+		}
+	]
+}
