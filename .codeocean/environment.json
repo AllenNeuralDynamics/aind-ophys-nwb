@@ -1,6 +1,6 @@
 {
 	"version": 1,
-	"base_image": "codeocean/jupyterlab:3.6.1-miniconda4.12.0-python3.9-ubuntu20.04",
+	"base_image": "codeocean/mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04",
 	"post_install": true,
 	"options": {
 		"registry_host_arg": true,
@@ -11,7 +11,7 @@
 		"pip3": {
 			"packages": [
 				{
-					"name": "git+https://github.com/AllenNeuralDynamics/aind-ophys-nwb-library.git@95d7d7c#egg=aind-ophys-nwb-library"
+					"name": "git+https://github.com/AllenNeuralDynamics/aind-ophys-nwb-library.git@2da9ba7#egg=aind-ophys-nwb-library"
 				}
 			],
 			"options": {},
