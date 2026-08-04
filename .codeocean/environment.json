@@ -11,7 +11,7 @@
 		"pip3": {
 			"packages": [
 				{
-					"name": "git+https://github.com/AllenNeuralDynamics/aind-ophys-nwb-library.git@2da9ba7#egg=aind-ophys-nwb-library"
+					"name": "git+https://github.com/AllenNeuralDynamics/aind-ophys-nwb-library.git@a461091#egg=aind-ophys-nwb-library"
 				}
 			],
 			"options": {},
