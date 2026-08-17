@@ -17,13 +17,10 @@ RUN pip install -U --no-cache-dir \
     matplotlib \
     pandas \
     h5py \
-    hdmf==3.14.5 \
-    hdmf_zarr==0.11.0 \
-	pynwb==2.8.3 \
     tifffile \
     imageio \
     aind-behavior-utils \
-    aind-nwb-utils==0.1.6\
+    aind-nwb-utils==0.2.8\
     nwbwidgets \
     numpy==1.26.4 \
     marshmallow \
