@@ -232,6 +232,29 @@ def load_generic_group(h5_file: Path, h5_group=None, h5_key=None) -> np.array:
             return f[h5_key][:]
 
 
+def load_available_suite2p_stats(extraction_h5: Path) -> dict:
+    """Load whichever SUITE2P_ROI_STATS keys are actually present.
+
+    CaImAn-based extraction writes none of these stats, and Suite2p v1.1
+    no longer computes "solidity", so callers must not assume all of
+    SUITE2P_ROI_STATS are present in the extraction file's rois/ group.
+
+    Parameters
+    ----------
+    extraction_h5: Path
+        Path to extraction_h5
+
+    Returns
+    -------
+    (dict)
+        Mapping of stat name to its per-ROI array, for whichever stats
+        are present.
+    """
+    with h5py.File(extraction_h5, "r") as f:
+        rois_group = f.get("rois", {})
+        return {stat: rois_group[stat][:] for stat in SUITE2P_ROI_STATS if stat in rois_group}
+
+
 def load_sparse_array(h5_file):
     """Obtain pixel masks from the h5 file
 
@@ -555,16 +578,11 @@ def nwb_ophys_single_plane(
         except Exception:
             cellpose_soma_probability = None
 
-        # Per-ROI suite2p morphology stats (always present in the
-        # extraction file's rois/ group).
-        suite2p_stats = {
-            stat: load_generic_group(
-                file_paths["planes"][plane_name]["extraction_h5"],
-                h5_group="rois",
-                h5_key=stat,
-            )
-            for stat in SUITE2P_ROI_STATS
-        }
+        # Per-ROI suite2p morphology stats. Not all of SUITE2P_ROI_STATS
+        # are necessarily present -- see load_available_suite2p_stats.
+        suite2p_stats = load_available_suite2p_stats(
+            file_paths["planes"][plane_name]["extraction_h5"]
+        )
 
         columns = [
             VectorData(
@@ -599,7 +617,7 @@ def nwb_ophys_single_plane(
             "dendrite_probability",
             "cellpose_soma_probability",
         ]
-        for stat in SUITE2P_ROI_STATS:
+        for stat in suite2p_stats:
             columns.append(
                 VectorData(
                     name=stat,
@@ -632,10 +650,7 @@ def nwb_ophys_single_plane(
                 is_dendrite=dendrite_predictions[idx],
                 dendrite_probability=dendrite_probabilities[idx][-1],
                 cellpose_soma_probability=cellpose_value,
-                **{
-                    stat: suite2p_stats[stat][idx]
-                    for stat in SUITE2P_ROI_STATS
-                },
+                **{stat: values[idx] for stat, values in suite2p_stats.items()},
             )
     except Exception as e:
         logging.warning(f"Error adding ROIs with classifier data: {e}")
@@ -953,16 +968,11 @@ def nwb_ophys(
         except Exception:
             cellpose_soma_probability = None
 
-        # Per-ROI suite2p morphology stats (always present in the
-        # extraction file's rois/ group).
-        suite2p_stats = {
-            stat: load_generic_group(
-                file_paths["planes"][plane_name]["extraction_h5"],
-                h5_group="rois",
-                h5_key=stat,
-            )
-            for stat in SUITE2P_ROI_STATS
-        }
+        # Per-ROI suite2p morphology stats. Not all of SUITE2P_ROI_STATS
+        # are necessarily present -- see load_available_suite2p_stats.
+        suite2p_stats = load_available_suite2p_stats(
+            file_paths["planes"][plane_name]["extraction_h5"]
+        )
 
         columns = [
             VectorData(
@@ -997,7 +1007,7 @@ def nwb_ophys(
             "dendrite_probability",
             "cellpose_soma_probability",
         ]
-        for stat in SUITE2P_ROI_STATS:
+        for stat in suite2p_stats:
             columns.append(
                 VectorData(
                     name=stat,
@@ -1104,10 +1114,7 @@ def nwb_ophys(
                 is_dendrite=dendrite_predictions[idx],
                 dendrite_probability=dendrite_probabilities[idx][-1],
                 cellpose_soma_probability=cellpose_value,
-                **{
-                    stat: suite2p_stats[stat][idx]
-                    for stat in SUITE2P_ROI_STATS
-                },
+                **{stat: values[idx] for stat, values in suite2p_stats.items()},
             )
 
         roi_traces, roi_names = load_signals(
