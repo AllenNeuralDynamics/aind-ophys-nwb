@@ -27,10 +27,9 @@ Code Ocean app panel emits. Hyphenated flags are **not** accepted.
 | `--output_dir` | `/results` | where the NWB asset is written |
 | `--raw_subdir` | `raw` | subdirectory of `input_dir` holding the raw asset |
 | `--processed_subdir` | `processed` | subdirectory holding the processed results |
-| `--nwb_name` | `pophys.nwb.zarr` | basename of the NWB Zarr store. Written into a subdirectory of `output_dir`, never at the results root, so the pipeline's basename-flattening `publishDir` cannot collide |
+| `--nwb_name` | `pophys.nwb.zarr` | basename of the NWB Zarr store, written under `output_dir/nwb/` |
 | `--extension_namespace` | `ndx-aibs-behavior-ophys.namespace.yaml` | the pynwb extension namespace; `code/run` passes an absolute path anchored on `code/` |
 | `--skip_lab_metadata` | `false` | skip the per-plane `ndx-aibs-behavior-ophys` lab metadata |
-| `--verify` | `false` | round-trip the emitted `processing.json` and `quality_control.json` back through the core aind-data-schema v2 objects |
 
 ### Runtime assets
 
@@ -44,14 +43,11 @@ path explicitly, so resolution does not depend on the working directory.
 
 ## Output
 
-- the NWB Zarr store, under a subdirectory of `output_dir`
-- a full `processing.json` — an aind-data-schema v2 `Processing`
-- a full `quality_control.json` — a v2 `QualityControl` with
-  `default_grouping = ["evaluation"]`
+- the NWB Zarr store, under `output_dir/nwb/`
+- a full `processing.json` — an aind-data-schema v2 `Processing`, also under
+  `output_dir/nwb/`
 
-Metadata is emitted against **aind-data-schema 2.x**. `QCEvaluation` does not
-exist in v2, so metric grouping is carried by each metric's `evaluation` tag
-rather than by a wrapping evaluation object.
+NWB packaging writes no `quality_control.json`.
 
 ## Examining NWB content
 
