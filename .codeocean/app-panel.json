@@ -1,0 +1,76 @@
+{
+	"version": 1,
+	"named_parameters": true,
+	"parameters": [
+		{
+			"id": "VscqGC0k9adomhei",
+			"name": "input_dir",
+			"param_name": "input_dir",
+			"description": "Directory holding the 'raw' and 'processed' input subdirectories.",
+			"help_text": "Directory holding the 'raw' and 'processed' input subdirectories.",
+			"type": "text",
+			"value_type": "string",
+			"default_value": "/data"
+		},
+		{
+			"id": "5NWdyUyGdoVC3Poa",
+			"name": "output_dir",
+			"param_name": "output_dir",
+			"description": "Directory where the NWB Zarr store and metadata are written.",
+			"help_text": "Directory where the NWB Zarr store and metadata are written.",
+			"type": "text",
+			"value_type": "string",
+			"default_value": "/results"
+		},
+		{
+			"id": "Jq09qQegAFVeQ6qp",
+			"name": "raw_subdir",
+			"param_name": "raw_subdir",
+			"description": "Subdirectory of input_dir holding the raw asset.",
+			"help_text": "Subdirectory of input_dir holding the raw asset.",
+			"type": "text",
+			"value_type": "string",
+			"default_value": "raw"
+		},
+		{
+			"id": "cVjgZJkKBIDMemht",
+			"name": "processed_subdir",
+			"param_name": "processed_subdir",
+			"description": "Subdirectory of input_dir holding the upstream step results.",
+			"help_text": "Subdirectory of input_dir holding the upstream step results.",
+			"type": "text",
+			"value_type": "string",
+			"default_value": "processed"
+		},
+		{
+			"id": "nbAEmeGFqALGS6yy",
+			"name": "nwb_name",
+			"param_name": "nwb_name",
+			"description": "Basename of the NWB Zarr store, written under output_dir/nwb.",
+			"help_text": "Basename of the NWB Zarr store, written under output_dir/nwb.",
+			"type": "text",
+			"value_type": "string",
+			"default_value": "pophys.nwb.zarr"
+		},
+		{
+			"id": "QbCFjDCsueaDAPIN",
+			"name": "extension_namespace",
+			"param_name": "extension_namespace",
+			"description": "ndx-aibs-behavior-ophys namespace YAML defining the per-plane lab metadata; a relative path resolves against the working directory.",
+			"help_text": "ndx-aibs-behavior-ophys namespace YAML defining the per-plane lab metadata; a relative path resolves against the working directory.",
+			"type": "text",
+			"value_type": "string",
+			"default_value": "ndx-aibs-behavior-ophys.namespace.yaml"
+		},
+		{
+			"id": "mbDy7boCqEOKxE2j",
+			"name": "skip_lab_metadata",
+			"param_name": "skip_lab_metadata",
+			"description": "Skip the ndx-aibs-behavior-ophys per-plane lab metadata.",
+			"help_text": "Skip the ndx-aibs-behavior-ophys per-plane lab metadata.",
+			"type": "text",
+			"value_type": "integer",
+			"default_value": "0"
+		}
+	]
+}
