@@ -1,0 +1,21 @@
+{
+	"version": 1,
+	"base_image": "codeocean/mambaforge3:24.5.0-0-python3.12.4-ubuntu22.04",
+	"post_install": true,
+	"options": {
+		"registry_host_arg": true,
+		"git_ask_pass": true,
+		"mount_secrets": true
+	},
+	"installers": {
+		"pip3": {
+			"packages": [
+				{
+					"name": "git+https://github.com/AllenNeuralDynamics/aind-ophys-nwb-library.git@v0.1.2#egg=aind-ophys-nwb-library"
+				}
+			],
+			"options": {},
+			"pre_install_options": {}
+		}
+	}
+}

@@ -1,6 +1,34 @@
 #!/usr/bin/env bash
-set -ex
+set -e
 
-# This is the master script for the capsule. When you click "Reproducible Run", the code in this file will execute.
-ls ../data
-python -u run_capsule.py "$@"
+# Nextflow interleaves concurrent tasks into one stream, so tag every line.
+TAG="[aind-ophys-nwb@${HOSTNAME:-nohost}]"
+trap 'echo "${TAG} run end: exit $?"' EXIT
+
+echo "${TAG} inputs: $(ls ../data | tr '\n' ' ')"
+
+# The custom pynwb extension is a runtime asset. main.nf stages only code/, so
+# fail in a second here rather than deep inside the NWB build. Anchored on the
+# script's own directory rather than the working directory: the namespace path
+# is then correct however this is invoked, instead of silently depending on cwd
+# being capsule/code.
+CODE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for asset in ndx-aibs-behavior-ophys.namespace.yaml ndx-aibs-behavior-ophys.extension.yaml; do
+    if [ ! -f "${CODE_DIR}/${asset}" ]; then
+        echo "${TAG} FATAL: required runtime asset ${asset} missing from ${CODE_DIR}" >&2
+        exit 1
+    fi
+done
+echo "${TAG} pynwb extension: ${CODE_DIR}/ndx-aibs-behavior-ophys.namespace.yaml"
+
+# Plain text, so tag every line.
+pip list 2>&1 | sed "s|^|${TAG} pip |"
+
+echo "${TAG} run begin: python -u run_capsule.py $*"
+# --extension_namespace comes FIRST so a value supplied by the app panel
+# (forwarded in "$@") still wins: pydantic-settings takes the last occurrence.
+# Unprefixed: log_schema emits JSON records that must stay parseable, and each
+# already carries process_name / acquisition_name.
+python -u run_capsule.py \
+    --extension_namespace="${CODE_DIR}/ndx-aibs-behavior-ophys.namespace.yaml" \
+    "$@" 2>&1
